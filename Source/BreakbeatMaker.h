@@ -96,6 +96,7 @@ public:
         
         addAndMakeVisible(sliceSizeDropDown);
         sliceSizeDropDown.addItemList({"1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/64", "1/128"}, 1);
+        sliceSizeDropDown.setSelectedId(3);
         sliceSizeDropDown.onChange = [this]
         {
             auto selectionId = sliceSizeDropDown.getSelectedId();
@@ -114,6 +115,21 @@ public:
             }
             
             calculateAudioBlocks();
+        };
+        
+        addAndMakeVisible(changeSampleProbabilityLabel);
+        changeSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
+        changeSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
+        changeSampleProbabilityLabel.setEditable(false);
+        changeSampleProbabilityLabel.attachToComponent(&changeSampleProbabilitySlider, true);
+        changeSampleProbabilityLabel.setJustificationType(Justification::right);
+        
+        addAndMakeVisible(changeSampleProbabilitySlider);
+        changeSampleProbabilitySlider.setRange(0.0, 1.0, 0.1);
+        changeSampleProbabilitySlider.setValue(0.3, dontSendNotification);
+        changeSampleProbabilitySlider.onValueChange = [this]()
+        {
+            sampleChangeThreshold = 1.0 - changeSampleProbabilitySlider.getValue();
         };
         
         setSize (500, 500);
@@ -155,12 +171,14 @@ public:
             
             if(position == sampleToEndOn)
             {
+               
                 if(randomPosition)
                 {
-                    auto randomBlockIdx = Random::getSystemRandom().nextInt(numAudioBlocks);
-                    
+                    auto perc = Random::getSystemRandom().nextFloat();
+                    blockIdx = perc > sampleChangeThreshold ? Random::getSystemRandom().nextInt(numAudioBlocks) : blockIdx;
+                        
                     // Move that many blocks along the fileBuffer
-                    position = blockSampleSize * randomBlockIdx;
+                    position = blockSampleSize * blockIdx;
                     sampleToEndOn = position + blockSampleSize;
                 }
                 else
@@ -183,8 +201,9 @@ public:
         openButton.setBounds (10, 10, getWidth() - 20, 20);
         clearButton.setBounds (10, 40, getWidth() - 20, 20);
         randomSlicesToggle.setBounds(10, 70, getWidth() - 20, 20);
-        sampleBPMField.setBounds(100, 100, getWidth() - 20, 20);
-        sliceSizeDropDown.setBounds(100, 130, getWidth() - 20, 20);
+        sampleBPMField.setBounds(100, 100, getWidth() - 120, 20);
+        sliceSizeDropDown.setBounds(100, 130, getWidth() - 120, 20);
+        changeSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
     }
 
 private:
@@ -255,8 +274,8 @@ private:
     Label sampleBPMField;
     Label sliceSizeLabel;
     ComboBox sliceSizeDropDown;
-    Label randomSizeSizeProbabilityLabel;
-    Slider randomSizeProbabilitySlider;
+    Label changeSampleProbabilityLabel;
+    Slider changeSampleProbabilitySlider;
 
     AudioFormatManager formatManager;
     AudioSampleBuffer fileBuffer;
@@ -266,9 +285,12 @@ private:
     bool randomPosition;
     int sampleBPM = 120;
     
+    float sampleChangeThreshold = 0.7;
+    
     float duration = 44100.0;
     int numAudioBlocks = 1;
     int blockSampleSize = 1; // in samples
+    int blockIdx = 0;
     double blockDivisionPower = 1.0; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)

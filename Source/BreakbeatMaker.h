@@ -132,7 +132,22 @@ public:
             sampleChangeThreshold = 1.0 - changeSampleProbabilitySlider.getValue();
         };
         
-        setSize (500, 500);
+        addAndMakeVisible(reverseSampleProbabilityLabel);
+        reverseSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
+        reverseSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
+        reverseSampleProbabilityLabel.setEditable(false);
+        reverseSampleProbabilityLabel.attachToComponent(&reverseSampleProbabilitySlider, true);
+        reverseSampleProbabilityLabel.setJustificationType(Justification::right);
+        
+        addAndMakeVisible(reverseSampleProbabilitySlider);
+        reverseSampleProbabilitySlider.setRange(0.0, 1.0, 0.1);
+        reverseSampleProbabilitySlider.setValue(0.3, dontSendNotification);
+        reverseSampleProbabilitySlider.onValueChange = [this]()
+        {
+            reverseSampleThreshold = 1.0 - reverseSampleProbabilitySlider.getValue();
+        };
+        
+        setSize (500, 200);
 
         formatManager.registerBasicFormats();
     }
@@ -149,7 +164,15 @@ public:
 
     void getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill) override
     {
-        auto const numInputChannels = fileBuffer.getNumChannels();
+        if(activeBuffer == nullptr)
+        {
+            auto reversePerc = Random::getSystemRandom().nextFloat();
+            activeBuffer = std::unique_ptr<AudioSampleBuffer>(reversePerc > reverseSampleThreshold ? &reverseFileBuffer : &forwardFileBuffer);
+        }
+        
+        bool changeDirection = false;
+        
+        auto const numInputChannels = activeBuffer->getNumChannels();
         auto const numOutputChannels = bufferToFill.buffer->getNumChannels();
         
         auto outputSamplesRemaining = bufferToFill.numSamples;
@@ -162,7 +185,7 @@ public:
             
             for(auto ch = 0; ch < numOutputChannels; ++ch)
             {
-                bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, fileBuffer, ch % numInputChannels, position, samplesThisTime);
+                bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, *activeBuffer, ch % numInputChannels, position, samplesThisTime);
             }
             
             outputSamplesRemaining -= samplesThisTime;
@@ -171,11 +194,10 @@ public:
             
             if(position == sampleToEndOn)
             {
-               
                 if(randomPosition)
                 {
-                    auto perc = Random::getSystemRandom().nextFloat();
-                    blockIdx = perc > sampleChangeThreshold ? Random::getSystemRandom().nextInt(numAudioBlocks) : blockIdx;
+                    auto changePerc = Random::getSystemRandom().nextFloat();
+                    blockIdx = changePerc > sampleChangeThreshold ? Random::getSystemRandom().nextInt(numAudioBlocks) : blockIdx;
                         
                     // Move that many blocks along the fileBuffer
                     position = blockSampleSize * blockIdx;
@@ -184,16 +206,29 @@ public:
                 else
                 {
                     position = 0;
-                    sampleToEndOn = fileBuffer.getNumSamples();
+                    sampleToEndOn = activeBuffer->getNumSamples();
                 }
-               
+                
+                changeDirection = true;
             }
+        }
+        
+        if(changeDirection)
+        {
+            changeDirection = false;
+            activeBuffer.release();
         }
     }
 
     void releaseResources() override
     {
-        fileBuffer.setSize (0, 0);
+        forwardFileBuffer.setSize (0, 0);
+        reverseFileBuffer.setSize (0, 0);
+        
+        if(activeBuffer)
+        {
+            activeBuffer.release();
+        }
     }
 
     void resized() override
@@ -204,6 +239,7 @@ public:
         sampleBPMField.setBounds(100, 100, getWidth() - 120, 20);
         sliceSizeDropDown.setBounds(100, 130, getWidth() - 120, 20);
         changeSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
+        reverseSampleProbabilitySlider.setBounds(100, 190, getWidth() - 120, 20);
     }
 
 private:
@@ -223,11 +259,20 @@ private:
                 // get length
                 duration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
                 
-                if(duration < 10.0)
+                if(duration < 15.0)
                 {
                     // read into sample buffer
-                    fileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
-                    reader->read(&fileBuffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
+                    forwardFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
+                    reverseFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
+                    
+                    reader->read(&forwardFileBuffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
+                    
+                    for(auto ch = 0; ch < reverseFileBuffer.getNumChannels(); ++ch)
+                    {
+                        reverseFileBuffer.copyFrom(ch, 0, forwardFileBuffer, ch, 0, forwardFileBuffer.getNumSamples());
+                        reverseFileBuffer.reverse(ch, 0, reverseFileBuffer.getNumSamples());
+                    }
+                    
                     position = 0;
                     sampleToEndOn = static_cast<int>(reader->lengthInSamples);
                     setAudioChannels(0, reader->numChannels);
@@ -238,7 +283,7 @@ private:
                 {
                      juce::AlertWindow::showMessageBox(juce::AlertWindow::WarningIcon,
                                                   juce::translate("Audio file too long!"),
-                                                       juce::translate("The file is ") + juce::String(duration) + juce::translate("seconds long. 10 Second limit!"));
+                                                       juce::translate("The file is ") + juce::String(duration) + juce::translate("seconds long. 15 Second limit!"));
                 }
                 
             }
@@ -252,11 +297,11 @@ private:
     
     void calculateAudioBlocks()
     {
-        auto const numSrcSamples = fileBuffer.getNumSamples();
+        auto const numSrcSamples = forwardFileBuffer.getNumSamples();
         if(numSrcSamples == 0)
         {
             numAudioBlocks = 1;
-            blockSampleSize = fileBuffer.getNumSamples();
+            blockSampleSize = forwardFileBuffer.getNumSamples();
             return;
         }
         
@@ -276,9 +321,13 @@ private:
     ComboBox sliceSizeDropDown;
     Label changeSampleProbabilityLabel;
     Slider changeSampleProbabilitySlider;
+    Label reverseSampleProbabilityLabel;
+    Slider reverseSampleProbabilitySlider;
 
     AudioFormatManager formatManager;
-    AudioSampleBuffer fileBuffer;
+    AudioSampleBuffer forwardFileBuffer;
+    AudioSampleBuffer reverseFileBuffer;
+    std::unique_ptr<AudioSampleBuffer> activeBuffer;
     
     int position;
     int sampleToEndOn;
@@ -286,6 +335,7 @@ private:
     int sampleBPM = 120;
     
     float sampleChangeThreshold = 0.7;
+    float reverseSampleThreshold = 0.7;
     
     float duration = 44100.0;
     int numAudioBlocks = 1;

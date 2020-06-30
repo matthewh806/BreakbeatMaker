@@ -47,11 +47,58 @@
 
 #pragma once
 
+#include <iostream>
 //==============================================================================
-class MainContentComponent   : public AudioAppComponent
+
+class ReferenceCountedBuffer
+: public juce::ReferenceCountedObject
+{
+public:
+    typedef juce::ReferenceCountedObjectPtr<ReferenceCountedBuffer> Ptr;
+    
+    ReferenceCountedBuffer(const juce::String& nameToUse, int numChannels, int numSamples)
+    : mName(nameToUse)
+    , mBuffer(numChannels, numSamples)
+    {
+        std::cout << "Buffer named: '" << mName << "' constructed. numChannels: " << numChannels << ", numSamples" << numSamples << "\n";
+    }
+    
+    ~ReferenceCountedBuffer()
+    {
+        std::cout << "Buffer named: '" << mName << "' destroyed." << "\n";
+    }
+    
+    int getPosition() const
+    {
+        return mPosition;
+    }
+    
+    void setPosition(int pos)
+    {
+        mPosition = pos;
+    }
+    
+    juce::AudioSampleBuffer* getAudioSampleBuffer()
+    {
+        return &mBuffer;
+    }
+    
+private:
+    juce::String mName;
+    juce::AudioSampleBuffer mBuffer;
+    
+    int mPosition = 0;
+    
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ReferenceCountedBuffer)
+};
+
+class MainContentComponent
+: public AudioAppComponent
+, private juce::Thread
 {
 public:
     MainContentComponent()
+    : juce::Thread("Background Thread")
     {
         addAndMakeVisible (mOpenButton);
         mOpenButton.setButtonText ("Open...");
@@ -150,11 +197,99 @@ public:
         setSize (500, 200);
 
         mFormatManager.registerBasicFormats();
+        
+        startThread();
     }
 
     ~MainContentComponent() override
     {
+        stopThread (4000);
         shutdownAudio();
+    }
+    
+    // juce::Thread
+    void run() override
+    {
+        while(!threadShouldExit())
+        {
+            checkForPathToOpen();
+            checkForBuffersToFree();
+            wait(500);
+        }
+    }
+    
+    void checkForBuffersToFree()
+    {
+        for(auto i = mForwardBuffers.size(); --i >= 0;)
+        {
+            ReferenceCountedBuffer::Ptr buffer(mForwardBuffers.getUnchecked(i));
+            
+            if(buffer->getReferenceCount() == 2)
+            {
+                mForwardBuffers.remove(i);
+            }
+        }
+        
+        for(auto i = mReverseBuffers.size(); --i >= 0;)
+        {
+            ReferenceCountedBuffer::Ptr buffer(mReverseBuffers.getUnchecked(i));
+            
+            if(buffer->getReferenceCount() == 2)
+            {
+                mReverseBuffers.remove(i);
+            }
+        }
+    }
+    
+    void checkForPathToOpen()
+    {
+        juce::String pathToOpen;
+        pathToOpen.swapWith(mChosenPath);
+        
+        if(pathToOpen.isEmpty())
+        {
+            return;
+        }
+        
+        juce::File file(pathToOpen);
+        std::unique_ptr<AudioFormatReader> reader { mFormatManager.createReaderFor(file) };
+        
+        if(reader != nullptr)
+        {
+            // get length
+            mDuration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
+            
+            if(mDuration < 15.0)
+            {
+                ReferenceCountedBuffer::Ptr newForwardBuffer = new ReferenceCountedBuffer(file.getFileName() + " Forward", static_cast<int>(reader->numChannels), static_cast<int>(reader->lengthInSamples));
+                ReferenceCountedBuffer::Ptr newReverseBuffer = new ReferenceCountedBuffer(file.getFileName() + " Reverse" , static_cast<int>(reader->numChannels), static_cast<int>(reader->lengthInSamples));
+                
+                reader->read(newForwardBuffer->getAudioSampleBuffer(), 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
+                
+                for(auto ch = 0; ch < newReverseBuffer->getAudioSampleBuffer()->getNumChannels(); ++ch)
+                {
+                    newReverseBuffer->getAudioSampleBuffer()->copyFrom(ch, 0, *(newForwardBuffer->getAudioSampleBuffer()), ch, 0, newReverseBuffer->getAudioSampleBuffer()->getNumSamples());
+                    newReverseBuffer->getAudioSampleBuffer()->reverse(ch, 0, newReverseBuffer->getAudioSampleBuffer()->getNumSamples());
+                }
+                
+                mCurrentForwardBuffer = newForwardBuffer;
+                mCurrentReverseBuffer = newReverseBuffer;
+                mForwardBuffers.add(mCurrentForwardBuffer);
+                mReverseBuffers.add(newReverseBuffer);
+
+                mSampleToEndOn = static_cast<int>(reader->lengthInSamples);
+                setAudioChannels(0, reader->numChannels);
+                
+                calculateAudioBlocks();
+            }
+            else
+            {
+                 juce::AlertWindow::showMessageBox(juce::AlertWindow::WarningIcon,
+                                              juce::translate("Audio file too long!"),
+                                                   juce::translate("The file is ") + juce::String(mDuration) + juce::translate("seconds long. 15 Second limit!"));
+            }
+            
+        }
     }
 
     void prepareToPlay (int, double) override
@@ -164,13 +299,24 @@ public:
 
     void getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill) override
     {
+        ReferenceCountedBuffer::Ptr retainedForwardBuffer(mCurrentForwardBuffer);
+        ReferenceCountedBuffer::Ptr retainedReverseBuffer(mCurrentReverseBuffer);
+        
+        if(retainedForwardBuffer == nullptr || retainedReverseBuffer == nullptr)
+        {
+            bufferToFill.clearActiveBufferRegion();
+            return;
+        }
+        
+        auto* currentForwardAudioSampleBuffer = retainedForwardBuffer->getAudioSampleBuffer();
+        auto* currentReverseAudioSampleBuffer = retainedReverseBuffer->getAudioSampleBuffer();
+        auto position = retainedForwardBuffer->getPosition();
+        
         if(mActiveBuffer == nullptr)
         {
             auto reversePerc = Random::getSystemRandom().nextFloat();
-            mActiveBuffer = std::unique_ptr<AudioSampleBuffer>(reversePerc > mReverseSampleThreshold ? &mReverseFileBuffer : &mForwardFileBuffer);
+            mActiveBuffer = reversePerc > mReverseSampleThreshold ? currentReverseAudioSampleBuffer : currentForwardAudioSampleBuffer;
         }
-        
-        bool changeDirection = false;
         
         auto const numInputChannels = mActiveBuffer->getNumChannels();
         auto const numOutputChannels = bufferToFill.buffer->getNumChannels();
@@ -178,21 +324,23 @@ public:
         auto outputSamplesRemaining = bufferToFill.numSamples;
         auto outputSamplesOffset = bufferToFill.startSample;
         
+        bool changeDirection = false;
+        
         while(outputSamplesRemaining > 0)
         {
-            auto bufferSamplesRemaining = mSampleToEndOn - mPosition;
+            auto bufferSamplesRemaining = mSampleToEndOn - position;
             auto samplesThisTime = std::min(outputSamplesRemaining, bufferSamplesRemaining);
             
             for(auto ch = 0; ch < numOutputChannels; ++ch)
             {
-                bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, *mActiveBuffer, ch % numInputChannels, mPosition, samplesThisTime);
+                bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, *mActiveBuffer, ch % numInputChannels, position, samplesThisTime);
             }
             
             outputSamplesRemaining -= samplesThisTime;
             outputSamplesOffset += samplesThisTime;
-            mPosition += samplesThisTime;
+            position += samplesThisTime;
             
-            if(mPosition == mSampleToEndOn)
+            if(position == mSampleToEndOn)
             {
                 if(mRandomPosition)
                 {
@@ -200,12 +348,12 @@ public:
                     mBlockIdx = changePerc > mSampleChangeThreshold ? Random::getSystemRandom().nextInt(mNumAudioBlocks) : mBlockIdx;
                         
                     // Move that many blocks along the fileBuffer
-                    mPosition = mBlockSampleSize * mBlockIdx;
-                    mSampleToEndOn = mPosition + mBlockSampleSize;
+                    position = mBlockSampleSize * mBlockIdx;
+                    mSampleToEndOn = position + mBlockSampleSize;
                 }
                 else
                 {
-                    mPosition = 0;
+                    position = 0;
                     mSampleToEndOn = mActiveBuffer->getNumSamples();
                 }
                 
@@ -213,21 +361,23 @@ public:
             }
         }
         
+        mCurrentForwardBuffer->setPosition(position);
+        
         if(changeDirection)
         {
             changeDirection = false;
-            mActiveBuffer.release();
+            mActiveBuffer = nullptr;
         }
     }
 
     void releaseResources() override
     {
-        mForwardFileBuffer.setSize (0, 0);
-        mReverseFileBuffer.setSize (0, 0);
+        mCurrentForwardBuffer = nullptr;
+        mCurrentReverseBuffer = nullptr;
         
         if(mActiveBuffer)
         {
-            mActiveBuffer.release();
+            mActiveBuffer = nullptr;
         }
     }
 
@@ -245,63 +395,43 @@ public:
 private:
     void mOpenButtonClicked()
     {
-        shutdownAudio();
-        
         juce::FileChooser chooser {"Select an audio file shorter than 2 seconds to play...", {}, "*.wav, *.aif, *.aiff"};
         
         if(chooser.browseForFileToOpen())
         {
             auto file = chooser.getResult();
-            std::unique_ptr<AudioFormatReader> reader { mFormatManager.createReaderFor(file) };
-            
-            if(reader != nullptr)
-            {
-                // get length
-                mDuration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
-                
-                if(mDuration < 15.0)
-                {
-                    // read into sample buffer
-                    mForwardFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
-                    mReverseFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
-                    
-                    reader->read(&mForwardFileBuffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
-                    
-                    for(auto ch = 0; ch < mReverseFileBuffer.getNumChannels(); ++ch)
-                    {
-                        mReverseFileBuffer.copyFrom(ch, 0, mForwardFileBuffer, ch, 0, mForwardFileBuffer.getNumSamples());
-                        mReverseFileBuffer.reverse(ch, 0, mReverseFileBuffer.getNumSamples());
-                    }
-                    
-                    mPosition = 0;
-                    mSampleToEndOn = static_cast<int>(reader->lengthInSamples);
-                    setAudioChannels(0, reader->numChannels);
-                    
-                    calculateAudioBlocks();
-                }
-                else
-                {
-                     juce::AlertWindow::showMessageBox(juce::AlertWindow::WarningIcon,
-                                                  juce::translate("Audio file too long!"),
-                                                       juce::translate("The file is ") + juce::String(mDuration) + juce::translate("seconds long. 15 Second limit!"));
-                }
-                
-            }
+            auto path = file.getFullPathName();
+            mChosenPath.swapWith(path);
+            notify();
         }
     }
 
     void mClearButtonClicked()
     {
-        shutdownAudio();
+        mCurrentForwardBuffer = nullptr;
+        mCurrentReverseBuffer = nullptr;
     }
     
     void calculateAudioBlocks()
     {
-        auto const numSrcSamples = mForwardFileBuffer.getNumSamples();
+        ReferenceCountedBuffer::Ptr retainedForwardBuffer(mCurrentForwardBuffer);
+        
+        if(retainedForwardBuffer == nullptr)
+        {
+            mNumAudioBlocks = 1;
+            
+            // TODO: What was my intention here...? Its odd mBlockSampleSize = 0?
+            mBlockSampleSize = 0;
+            return;
+        }
+        
+        auto const numSrcSamples = retainedForwardBuffer->getAudioSampleBuffer()->getNumSamples();
         if(numSrcSamples == 0)
         {
             mNumAudioBlocks = 1;
-            mBlockSampleSize = mForwardFileBuffer.getNumSamples();
+            
+            // TODO: What was my intention here...? Its odd mBlockSampleSize = 0?
+            mBlockSampleSize = retainedForwardBuffer->getAudioSampleBuffer()->getNumSamples();
             return;
         }
         
@@ -325,11 +455,16 @@ private:
     Slider mReverseSampleProbabilitySlider;
 
     AudioFormatManager mFormatManager;
-    AudioSampleBuffer mForwardFileBuffer;
-    AudioSampleBuffer mReverseFileBuffer;
-    std::unique_ptr<AudioSampleBuffer> mActiveBuffer;
+    AudioSampleBuffer* mActiveBuffer;
     
-    int mPosition;
+    // TODO: Store both forward and reverse buffers in the same ReferenceCountedBufferObject
+    juce::ReferenceCountedArray<ReferenceCountedBuffer> mForwardBuffers;
+    ReferenceCountedBuffer::Ptr mCurrentForwardBuffer;
+    juce::ReferenceCountedArray<ReferenceCountedBuffer> mReverseBuffers;
+    ReferenceCountedBuffer::Ptr mCurrentReverseBuffer;
+    
+    juce::String mChosenPath;
+    
     int mSampleToEndOn;
     bool mRandomPosition;
     int mSampleBPM = 120;

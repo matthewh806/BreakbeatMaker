@@ -53,103 +53,103 @@ class MainContentComponent   : public AudioAppComponent
 public:
     MainContentComponent()
     {
-        addAndMakeVisible (openButton);
-        openButton.setButtonText ("Open...");
-        openButton.onClick = [this] { openButtonClicked(); };
+        addAndMakeVisible (mOpenButton);
+        mOpenButton.setButtonText ("Open...");
+        mOpenButton.onClick = [this] { mOpenButtonClicked(); };
 
-        addAndMakeVisible (clearButton);
-        clearButton.setButtonText ("Clear");
-        clearButton.onClick = [this] { clearButtonClicked(); };
+        addAndMakeVisible (mClearButton);
+        mClearButton.setButtonText ("Clear");
+        mClearButton.onClick = [this] { mClearButtonClicked(); };
         
-        addAndMakeVisible (randomSlicesToggle);
-        randomSlicesToggle.setButtonText("Random Slices");
-        randomSlicesToggle.onClick = [this] { randomPosition = !randomPosition; };
+        addAndMakeVisible (mRandomSlicesToggle);
+        mRandomSlicesToggle.setButtonText("Random Slices");
+        mRandomSlicesToggle.onClick = [this] { mRandomPosition = !mRandomPosition; };
         
-        addAndMakeVisible(sampleBPMLabel);
-        sampleBPMLabel.setText("Sample BPM: ", dontSendNotification);
-        sampleBPMLabel.attachToComponent(&sampleBPMField, true);
-        sampleBPMLabel.setEditable(false);
-        sampleBPMLabel.setJustificationType(Justification::right);
-        sampleBPMLabel.setColour(Label::textColourId, Colours::white);
+        addAndMakeVisible(mmSampleBPMLabel);
+        mmSampleBPMLabel.setText("Sample BPM: ", dontSendNotification);
+        mmSampleBPMLabel.attachToComponent(&mmSampleBPMField, true);
+        mmSampleBPMLabel.setEditable(false);
+        mmSampleBPMLabel.setJustificationType(Justification::right);
+        mmSampleBPMLabel.setColour(Label::textColourId, Colours::white);
         
-        addAndMakeVisible(sampleBPMField);
-        sampleBPMField.setText("120", dontSendNotification);
-        sampleBPMField.setColour(Label::textColourId, Colours::white);
-        sampleBPMField.setEditable(true);
-        sampleBPMField.onTextChange = [this]
+        addAndMakeVisible(mmSampleBPMField);
+        mmSampleBPMField.setText("120", dontSendNotification);
+        mmSampleBPMField.setColour(Label::textColourId, Colours::white);
+        mmSampleBPMField.setEditable(true);
+        mmSampleBPMField.onTextChange = [this]
         {
-            sampleBPM = sampleBPMField.getText().getIntValue();
+            mSampleBPM = mmSampleBPMField.getText().getIntValue();
             calculateAudioBlocks();
         };
-        sampleBPMField.onEditorShow = [this]
+        mmSampleBPMField.onEditorShow = [this]
         {
-            auto* ed = sampleBPMField.getCurrentTextEditor();
+            auto* ed = mmSampleBPMField.getCurrentTextEditor();
             ed->setInputRestrictions(3, "1234567890");
         };
         
-        addAndMakeVisible(sliceSizeLabel);
-        sliceSizeLabel.setText("Slice size: ", dontSendNotification);
-        sliceSizeLabel.setColour(Label::textColourId, Colours::white);
-        sliceSizeLabel.setEditable(false);
-        sliceSizeLabel.attachToComponent(&sliceSizeDropDown, true);
-        sliceSizeLabel.setJustificationType(Justification::right);
+        addAndMakeVisible(mSliceSizeLabel);
+        mSliceSizeLabel.setText("Slice size: ", dontSendNotification);
+        mSliceSizeLabel.setColour(Label::textColourId, Colours::white);
+        mSliceSizeLabel.setEditable(false);
+        mSliceSizeLabel.attachToComponent(&mSliceSizeDropDown, true);
+        mSliceSizeLabel.setJustificationType(Justification::right);
         
-        addAndMakeVisible(sliceSizeDropDown);
-        sliceSizeDropDown.addItemList({"1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/64", "1/128"}, 1);
-        sliceSizeDropDown.setSelectedId(3);
-        sliceSizeDropDown.onChange = [this]
+        addAndMakeVisible(mSliceSizeDropDown);
+        mSliceSizeDropDown.addItemList({"1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/64", "1/128"}, 1);
+        mSliceSizeDropDown.setSelectedId(3);
+        mSliceSizeDropDown.onChange = [this]
         {
-            auto selectionId = sliceSizeDropDown.getSelectedId();
+            auto selectionId = mSliceSizeDropDown.getSelectedId();
             
             switch(selectionId)
             {
                 case 1:
-                    blockDivisionPower = 4;
+                    mBlockDivisionPower = 4;
                     break;
                 case 2:
-                    blockDivisionPower = 2;
+                    mBlockDivisionPower = 2;
                     break;
                 default:
-                    blockDivisionPower = 1.0 / std::pow(2, selectionId - 3);
+                    mBlockDivisionPower = 1.0 / std::pow(2, selectionId - 3);
                     break;
             }
             
             calculateAudioBlocks();
         };
         
-        addAndMakeVisible(changeSampleProbabilityLabel);
-        changeSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
-        changeSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
-        changeSampleProbabilityLabel.setEditable(false);
-        changeSampleProbabilityLabel.attachToComponent(&changeSampleProbabilitySlider, true);
-        changeSampleProbabilityLabel.setJustificationType(Justification::right);
+        addAndMakeVisible(mChangeSampleProbabilityLabel);
+        mChangeSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
+        mChangeSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
+        mChangeSampleProbabilityLabel.setEditable(false);
+        mChangeSampleProbabilityLabel.attachToComponent(&mChangeSampleProbabilitySlider, true);
+        mChangeSampleProbabilityLabel.setJustificationType(Justification::right);
         
-        addAndMakeVisible(changeSampleProbabilitySlider);
-        changeSampleProbabilitySlider.setRange(0.0, 1.0, 0.1);
-        changeSampleProbabilitySlider.setValue(0.3, dontSendNotification);
-        changeSampleProbabilitySlider.onValueChange = [this]()
+        addAndMakeVisible(mChangeSampleProbabilitySlider);
+        mChangeSampleProbabilitySlider.setRange(0.0, 1.0, 0.1);
+        mChangeSampleProbabilitySlider.setValue(0.3, dontSendNotification);
+        mChangeSampleProbabilitySlider.onValueChange = [this]()
         {
-            sampleChangeThreshold = 1.0 - changeSampleProbabilitySlider.getValue();
+            mSampleChangeThreshold = 1.0 - mChangeSampleProbabilitySlider.getValue();
         };
         
-        addAndMakeVisible(reverseSampleProbabilityLabel);
-        reverseSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
-        reverseSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
-        reverseSampleProbabilityLabel.setEditable(false);
-        reverseSampleProbabilityLabel.attachToComponent(&reverseSampleProbabilitySlider, true);
-        reverseSampleProbabilityLabel.setJustificationType(Justification::right);
+        addAndMakeVisible(mReverseSampleProbabilityLabel);
+        mReverseSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
+        mReverseSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
+        mReverseSampleProbabilityLabel.setEditable(false);
+        mReverseSampleProbabilityLabel.attachToComponent(&mReverseSampleProbabilitySlider, true);
+        mReverseSampleProbabilityLabel.setJustificationType(Justification::right);
         
-        addAndMakeVisible(reverseSampleProbabilitySlider);
-        reverseSampleProbabilitySlider.setRange(0.0, 1.0, 0.1);
-        reverseSampleProbabilitySlider.setValue(0.3, dontSendNotification);
-        reverseSampleProbabilitySlider.onValueChange = [this]()
+        addAndMakeVisible(mReverseSampleProbabilitySlider);
+        mReverseSampleProbabilitySlider.setRange(0.0, 1.0, 0.1);
+        mReverseSampleProbabilitySlider.setValue(0.3, dontSendNotification);
+        mReverseSampleProbabilitySlider.onValueChange = [this]()
         {
-            reverseSampleThreshold = 1.0 - reverseSampleProbabilitySlider.getValue();
+            mReverseSampleThreshold = 1.0 - mReverseSampleProbabilitySlider.getValue();
         };
         
         setSize (500, 200);
 
-        formatManager.registerBasicFormats();
+        mFormatManager.registerBasicFormats();
     }
 
     ~MainContentComponent() override
@@ -164,15 +164,15 @@ public:
 
     void getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill) override
     {
-        if(activeBuffer == nullptr)
+        if(mActiveBuffer == nullptr)
         {
             auto reversePerc = Random::getSystemRandom().nextFloat();
-            activeBuffer = std::unique_ptr<AudioSampleBuffer>(reversePerc > reverseSampleThreshold ? &reverseFileBuffer : &forwardFileBuffer);
+            mActiveBuffer = std::unique_ptr<AudioSampleBuffer>(reversePerc > mReverseSampleThreshold ? &mReverseFileBuffer : &mForwardFileBuffer);
         }
         
         bool changeDirection = false;
         
-        auto const numInputChannels = activeBuffer->getNumChannels();
+        auto const numInputChannels = mActiveBuffer->getNumChannels();
         auto const numOutputChannels = bufferToFill.buffer->getNumChannels();
         
         auto outputSamplesRemaining = bufferToFill.numSamples;
@@ -180,33 +180,33 @@ public:
         
         while(outputSamplesRemaining > 0)
         {
-            auto bufferSamplesRemaining = sampleToEndOn - position;
+            auto bufferSamplesRemaining = mSampleToEndOn - mPosition;
             auto samplesThisTime = std::min(outputSamplesRemaining, bufferSamplesRemaining);
             
             for(auto ch = 0; ch < numOutputChannels; ++ch)
             {
-                bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, *activeBuffer, ch % numInputChannels, position, samplesThisTime);
+                bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, *mActiveBuffer, ch % numInputChannels, mPosition, samplesThisTime);
             }
             
             outputSamplesRemaining -= samplesThisTime;
             outputSamplesOffset += samplesThisTime;
-            position += samplesThisTime;
+            mPosition += samplesThisTime;
             
-            if(position == sampleToEndOn)
+            if(mPosition == mSampleToEndOn)
             {
-                if(randomPosition)
+                if(mRandomPosition)
                 {
                     auto changePerc = Random::getSystemRandom().nextFloat();
-                    blockIdx = changePerc > sampleChangeThreshold ? Random::getSystemRandom().nextInt(numAudioBlocks) : blockIdx;
+                    mBlockIdx = changePerc > mSampleChangeThreshold ? Random::getSystemRandom().nextInt(mNumAudioBlocks) : mBlockIdx;
                         
                     // Move that many blocks along the fileBuffer
-                    position = blockSampleSize * blockIdx;
-                    sampleToEndOn = position + blockSampleSize;
+                    mPosition = mBlockSampleSize * mBlockIdx;
+                    mSampleToEndOn = mPosition + mBlockSampleSize;
                 }
                 else
                 {
-                    position = 0;
-                    sampleToEndOn = activeBuffer->getNumSamples();
+                    mPosition = 0;
+                    mSampleToEndOn = mActiveBuffer->getNumSamples();
                 }
                 
                 changeDirection = true;
@@ -216,34 +216,34 @@ public:
         if(changeDirection)
         {
             changeDirection = false;
-            activeBuffer.release();
+            mActiveBuffer.release();
         }
     }
 
     void releaseResources() override
     {
-        forwardFileBuffer.setSize (0, 0);
-        reverseFileBuffer.setSize (0, 0);
+        mForwardFileBuffer.setSize (0, 0);
+        mReverseFileBuffer.setSize (0, 0);
         
-        if(activeBuffer)
+        if(mActiveBuffer)
         {
-            activeBuffer.release();
+            mActiveBuffer.release();
         }
     }
 
     void resized() override
     {
-        openButton.setBounds (10, 10, getWidth() - 20, 20);
-        clearButton.setBounds (10, 40, getWidth() - 20, 20);
-        randomSlicesToggle.setBounds(10, 70, getWidth() - 20, 20);
-        sampleBPMField.setBounds(100, 100, getWidth() - 120, 20);
-        sliceSizeDropDown.setBounds(100, 130, getWidth() - 120, 20);
-        changeSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
-        reverseSampleProbabilitySlider.setBounds(100, 190, getWidth() - 120, 20);
+        mOpenButton.setBounds (10, 10, getWidth() - 20, 20);
+        mClearButton.setBounds (10, 40, getWidth() - 20, 20);
+        mRandomSlicesToggle.setBounds(10, 70, getWidth() - 20, 20);
+        mmSampleBPMField.setBounds(100, 100, getWidth() - 120, 20);
+        mSliceSizeDropDown.setBounds(100, 130, getWidth() - 120, 20);
+        mChangeSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
+        mReverseSampleProbabilitySlider.setBounds(100, 190, getWidth() - 120, 20);
     }
 
 private:
-    void openButtonClicked()
+    void mOpenButtonClicked()
     {
         shutdownAudio();
         
@@ -252,29 +252,29 @@ private:
         if(chooser.browseForFileToOpen())
         {
             auto file = chooser.getResult();
-            std::unique_ptr<AudioFormatReader> reader { formatManager.createReaderFor(file) };
+            std::unique_ptr<AudioFormatReader> reader { mFormatManager.createReaderFor(file) };
             
             if(reader != nullptr)
             {
                 // get length
-                duration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
+                mDuration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
                 
-                if(duration < 15.0)
+                if(mDuration < 15.0)
                 {
                     // read into sample buffer
-                    forwardFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
-                    reverseFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
+                    mForwardFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
+                    mReverseFileBuffer.setSize(reader->numChannels, static_cast<int>(reader->lengthInSamples));
                     
-                    reader->read(&forwardFileBuffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
+                    reader->read(&mForwardFileBuffer, 0, static_cast<int>(reader->lengthInSamples), 0, true, true);
                     
-                    for(auto ch = 0; ch < reverseFileBuffer.getNumChannels(); ++ch)
+                    for(auto ch = 0; ch < mReverseFileBuffer.getNumChannels(); ++ch)
                     {
-                        reverseFileBuffer.copyFrom(ch, 0, forwardFileBuffer, ch, 0, forwardFileBuffer.getNumSamples());
-                        reverseFileBuffer.reverse(ch, 0, reverseFileBuffer.getNumSamples());
+                        mReverseFileBuffer.copyFrom(ch, 0, mForwardFileBuffer, ch, 0, mForwardFileBuffer.getNumSamples());
+                        mReverseFileBuffer.reverse(ch, 0, mReverseFileBuffer.getNumSamples());
                     }
                     
-                    position = 0;
-                    sampleToEndOn = static_cast<int>(reader->lengthInSamples);
+                    mPosition = 0;
+                    mSampleToEndOn = static_cast<int>(reader->lengthInSamples);
                     setAudioChannels(0, reader->numChannels);
                     
                     calculateAudioBlocks();
@@ -283,65 +283,65 @@ private:
                 {
                      juce::AlertWindow::showMessageBox(juce::AlertWindow::WarningIcon,
                                                   juce::translate("Audio file too long!"),
-                                                       juce::translate("The file is ") + juce::String(duration) + juce::translate("seconds long. 15 Second limit!"));
+                                                       juce::translate("The file is ") + juce::String(mDuration) + juce::translate("seconds long. 15 Second limit!"));
                 }
                 
             }
         }
     }
 
-    void clearButtonClicked()
+    void mClearButtonClicked()
     {
         shutdownAudio();
     }
     
     void calculateAudioBlocks()
     {
-        auto const numSrcSamples = forwardFileBuffer.getNumSamples();
+        auto const numSrcSamples = mForwardFileBuffer.getNumSamples();
         if(numSrcSamples == 0)
         {
-            numAudioBlocks = 1;
-            blockSampleSize = forwardFileBuffer.getNumSamples();
+            mNumAudioBlocks = 1;
+            mBlockSampleSize = mForwardFileBuffer.getNumSamples();
             return;
         }
         
         // length, bpm
-        auto bps = sampleBPM / 60.0;
-        numAudioBlocks = std::max(bps * duration / static_cast<double>(blockDivisionPower), 1.0);
-        blockSampleSize = roundToInt(numSrcSamples / numAudioBlocks);
+        auto bps = mSampleBPM / 60.0;
+        mNumAudioBlocks = std::max(bps * mDuration / static_cast<double>(mBlockDivisionPower), 1.0);
+        mBlockSampleSize = roundToInt(numSrcSamples / mNumAudioBlocks);
     }
 
     //==========================================================================
-    TextButton openButton;
-    TextButton clearButton;
-    ToggleButton randomSlicesToggle;
-    Label sampleBPMLabel;
-    Label sampleBPMField;
-    Label sliceSizeLabel;
-    ComboBox sliceSizeDropDown;
-    Label changeSampleProbabilityLabel;
-    Slider changeSampleProbabilitySlider;
-    Label reverseSampleProbabilityLabel;
-    Slider reverseSampleProbabilitySlider;
+    TextButton mOpenButton;
+    TextButton mClearButton;
+    ToggleButton mRandomSlicesToggle;
+    Label mmSampleBPMLabel;
+    Label mmSampleBPMField;
+    Label mSliceSizeLabel;
+    ComboBox mSliceSizeDropDown;
+    Label mChangeSampleProbabilityLabel;
+    Slider mChangeSampleProbabilitySlider;
+    Label mReverseSampleProbabilityLabel;
+    Slider mReverseSampleProbabilitySlider;
 
-    AudioFormatManager formatManager;
-    AudioSampleBuffer forwardFileBuffer;
-    AudioSampleBuffer reverseFileBuffer;
-    std::unique_ptr<AudioSampleBuffer> activeBuffer;
+    AudioFormatManager mFormatManager;
+    AudioSampleBuffer mForwardFileBuffer;
+    AudioSampleBuffer mReverseFileBuffer;
+    std::unique_ptr<AudioSampleBuffer> mActiveBuffer;
     
-    int position;
-    int sampleToEndOn;
-    bool randomPosition;
-    int sampleBPM = 120;
+    int mPosition;
+    int mSampleToEndOn;
+    bool mRandomPosition;
+    int mSampleBPM = 120;
     
-    float sampleChangeThreshold = 0.7;
-    float reverseSampleThreshold = 0.7;
+    float mSampleChangeThreshold = 0.7;
+    float mReverseSampleThreshold = 0.7;
     
-    float duration = 44100.0;
-    int numAudioBlocks = 1;
-    int blockSampleSize = 1; // in samples
-    int blockIdx = 0;
-    double blockDivisionPower = 1.0; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
+    float mDuration = 44100.0;
+    int mNumAudioBlocks = 1;
+    int mBlockSampleSize = 1; // in samples
+    int mBlockIdx = 0;
+    double mBlockDivisionPower = 1.0; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
 };

@@ -139,7 +139,6 @@ private:
     
     juce::String mChosenPath;
     
-    int mSampleToEndOn;
     bool mRandomPosition;
     int mSampleBPM = 120;
     
@@ -147,9 +146,10 @@ private:
     float mReverseSampleThreshold = 0.7;
     
     float mDuration = 44100.0;
-    int mNumAudioBlocks = 1;
-    int mBlockSampleSize = 1; // in samples
-    int mBlockIdx = 0;
+    std::atomic<int> mNumAudioBlocks {1};
+    std::atomic<int> mSampleToEndOn;
+    std::atomic<int> mBlockSampleSize {1}; // in samples
+    std::atomic<int> mBlockIdx {0};
     double mBlockDivisionPower = 1.0; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)

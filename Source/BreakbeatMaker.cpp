@@ -216,16 +216,22 @@ void MainContentComponent::prepareToPlay (int, double)
 
 void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill)
 {
+    bufferToFill.clearActiveBufferRegion();
     ReferenceCountedForwardAndReverseBuffer::Ptr retainedBuffer(mCurrentBuffer);
     
     if(retainedBuffer == nullptr)
     {
-        bufferToFill.clearActiveBufferRegion();
         return;
     }
     
+    auto sampleToEndOn = mSampleToEndOn.load();
+    auto blockIdx = mBlockIdx.load();
+    auto const blockSampleSize = mBlockSampleSize.load();
+    auto const numAudioBlocks = mNumAudioBlocks.load();
+    auto position = retainedBuffer->getPosition(); // loads atomically
+    
     auto* currentAudioSampleBuffer = retainedBuffer->getCurrentAudioSampleBuffer();
-    auto position = retainedBuffer->getPosition();
+    
     auto const numInputChannels = currentAudioSampleBuffer->getNumChannels();
     auto const numOutputChannels = bufferToFill.buffer->getNumChannels();
     
@@ -236,7 +242,7 @@ void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& buff
     
     while(outputSamplesRemaining > 0)
     {
-        auto bufferSamplesRemaining = mSampleToEndOn - position;
+        auto bufferSamplesRemaining = std::max(sampleToEndOn - position, 0);
         auto samplesThisTime = std::min(outputSamplesRemaining, bufferSamplesRemaining);
         
         for(auto ch = 0; ch < numOutputChannels; ++ch)
@@ -248,27 +254,30 @@ void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& buff
         outputSamplesOffset += samplesThisTime;
         position += samplesThisTime;
         
-        if(position == mSampleToEndOn)
+        if(position >= sampleToEndOn)
         {
             if(mRandomPosition)
             {
                 auto changePerc = Random::getSystemRandom().nextFloat();
-                mBlockIdx = changePerc > mSampleChangeThreshold ? Random::getSystemRandom().nextInt(mNumAudioBlocks) : mBlockIdx;
+                blockIdx = changePerc > mSampleChangeThreshold ? Random::getSystemRandom().nextInt(numAudioBlocks) : blockIdx;
                     
                 // Move that many blocks along the fileBuffer
-                position = mBlockSampleSize * mBlockIdx;
-                mSampleToEndOn = position + mBlockSampleSize;
+                position = std::min(blockSampleSize * blockIdx, currentAudioSampleBuffer->getNumSamples());
+                // TODO check why it was out of range in the first place. Thread issues?
+                sampleToEndOn = std::min(position + blockSampleSize, currentAudioSampleBuffer->getNumSamples());
             }
             else
             {
                 position = 0;
-                mSampleToEndOn = currentAudioSampleBuffer->getNumSamples();
+                sampleToEndOn = currentAudioSampleBuffer->getNumSamples();
             }
             
             changeDirection = true;
         }
     }
     
+    mSampleToEndOn.exchange(sampleToEndOn);
+    mBlockIdx.exchange(blockIdx);
     retainedBuffer->setPosition(position);
     
     if(changeDirection)

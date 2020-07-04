@@ -35,7 +35,7 @@ private:
     
     juce::AudioSampleBuffer* mActiveBuffer;
     
-    int mPosition = 0;
+    std::atomic<int> mPosition {0};
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ReferenceCountedForwardAndReverseBuffer)
 };

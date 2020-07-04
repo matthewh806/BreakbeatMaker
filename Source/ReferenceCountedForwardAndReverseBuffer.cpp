@@ -34,12 +34,12 @@ ReferenceCountedForwardAndReverseBuffer::~ReferenceCountedForwardAndReverseBuffe
 
 int ReferenceCountedForwardAndReverseBuffer::getPosition() const
 {
-    return mPosition;
+    return mPosition.load();
 }
 
 void ReferenceCountedForwardAndReverseBuffer::setPosition(int pos)
 {
-    mPosition = pos;
+    mPosition.exchange(pos);
 }
 
 void ReferenceCountedForwardAndReverseBuffer::updateCurrentSampleBuffer(float reverseThreshold)

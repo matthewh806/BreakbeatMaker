@@ -186,7 +186,7 @@ public:
         };
         
         addAndMakeVisible(mChangeSampleProbabilityLabel);
-        mChangeSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
+        mChangeSampleProbabilityLabel.setText("Swap %: ", dontSendNotification);
         mChangeSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
         mChangeSampleProbabilityLabel.setEditable(false);
         mChangeSampleProbabilityLabel.attachToComponent(&mChangeSampleProbabilitySlider, true);
@@ -201,7 +201,7 @@ public:
         };
         
         addAndMakeVisible(mReverseSampleProbabilityLabel);
-        mReverseSampleProbabilityLabel.setText("Change Sample Probability: ", dontSendNotification);
+        mReverseSampleProbabilityLabel.setText("Reverse %: ", dontSendNotification);
         mReverseSampleProbabilityLabel.setColour(Label::textColourId, Colours::white);
         mReverseSampleProbabilityLabel.setEditable(false);
         mReverseSampleProbabilityLabel.attachToComponent(&mReverseSampleProbabilitySlider, true);
@@ -218,6 +218,7 @@ public:
         setSize (500, 200);
 
         mFormatManager.registerBasicFormats();
+        setAudioChannels (0, 2);
         
         startThread();
     }
@@ -274,13 +275,10 @@ public:
             {
                 ReferenceCountedForwardAndReverseBuffer::Ptr newBuffer = new ReferenceCountedForwardAndReverseBuffer(file.getFileName(), reader.get());
                 
-                
                 mCurrentBuffer = newBuffer;
                 mBuffers.add(mCurrentBuffer);
 
                 mSampleToEndOn = static_cast<int>(reader->lengthInSamples);
-                setAudioChannels(0, reader->numChannels);
-                
                 calculateAudioBlocks();
             }
             else

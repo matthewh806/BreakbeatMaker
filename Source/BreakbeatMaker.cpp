@@ -10,13 +10,74 @@
 
 #include "BreakbeatMaker.h"
 
+MainContentComponent::WaveformComponent::WaveformComponent(MainContentComponent& parent, juce::AudioFormatManager& formatManager)
+: mParentComponent(parent)
+, mAudioFormatManager(formatManager)
+, mThumbnailCache(5)
+, mThumbnail(512, mAudioFormatManager, mThumbnailCache)
+{
+    
+}
+
+MainContentComponent::WaveformComponent::~WaveformComponent()
+{
+    
+}
+
+
+juce::AudioThumbnail& MainContentComponent::WaveformComponent::getThumbnail()
+{
+    return mThumbnail;
+}
+
+void MainContentComponent::WaveformComponent::resized()
+{
+    
+}
+
+void MainContentComponent::WaveformComponent::paint(juce::Graphics& g)
+{
+    juce::Rectangle<int> thumbnailBounds (10, 10, getWidth()-20, getHeight()-20);
+    
+    if(mThumbnail.getNumChannels() == 0)
+    {
+        g.setColour(juce::Colours::darkgrey);
+        g.fillRect(thumbnailBounds);
+        g.setColour(juce::Colours::white);
+        g.drawFittedText("Drag and drop and audio file", thumbnailBounds, juce::Justification::centred, 1);
+    }
+    else
+    {
+        g.setColour(juce::Colours::white);
+        g.fillRect(thumbnailBounds);
+        g.setColour(juce::Colours::red);
+        mThumbnail.drawChannels(g, thumbnailBounds, 0.0, mThumbnail.getTotalLength(), 1.0f);
+    }
+}
+
+bool MainContentComponent::WaveformComponent::isInterestedInFileDrag (const StringArray& files)
+{
+    return true;
+}
+
+void MainContentComponent::WaveformComponent::filesDropped (const StringArray& files, int x, int y)
+{
+    // only deal with one file for now.
+    juce::ignoreUnused(x, y);
+    
+    auto const filePath = files[0];
+    juce::File f { filePath };
+    
+    if(f.existsAsFile())
+    {
+        auto path = f.getFullPathName();
+        mParentComponent.newFileOpened(path);
+    }
+}
+
 MainContentComponent::MainContentComponent()
 : juce::Thread("Background Thread")
 {
-    addAndMakeVisible (mOpenButton);
-    mOpenButton.setButtonText ("Open...");
-    mOpenButton.onClick = [this] { openButtonClicked(); };
-
     addAndMakeVisible (mClearButton);
     mClearButton.setButtonText ("Clear");
     mClearButton.onClick = [this] { clearButtonClicked(); };
@@ -107,11 +168,14 @@ MainContentComponent::MainContentComponent()
         mReverseSampleThreshold = 1.0 - mReverseSampleProbabilitySlider.getValue();
     };
     
+    addAndMakeVisible(mWaveformComponent);
+    
     setSize (500, 440);
 
     mFormatManager.registerBasicFormats();
     setAudioChannels (0, 2);
-    mThumbnail.addChangeListener(this);
+    
+    mWaveformComponent.getThumbnail().addChangeListener(this);
     
     startThread();
 }
@@ -124,33 +188,19 @@ MainContentComponent::~MainContentComponent()
 
 void MainContentComponent::resized()
 {
-    mOpenButton.setBounds (10, 10, getWidth() - 20, 20);
-    mClearButton.setBounds (10, 40, getWidth() - 20, 20);
-    mRandomSlicesToggle.setBounds(10, 70, getWidth() - 20, 20);
-    mmSampleBPMField.setBounds(100, 100, getWidth() - 120, 20);
-    mSliceSizeDropDown.setBounds(100, 130, getWidth() - 120, 20);
-    mChangeSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
-    mReverseSampleProbabilitySlider.setBounds(100, 190, getWidth() - 120, 20);
+    mClearButton.setBounds (10, 10, getWidth() - 20, 20);
+    mRandomSlicesToggle.setBounds(10, 40, getWidth() - 20, 20);
+    mmSampleBPMField.setBounds(100, 70, getWidth() - 120, 20);
+    mSliceSizeDropDown.setBounds(100, 100, getWidth() - 120, 20);
+    mChangeSampleProbabilitySlider.setBounds(100, 130, getWidth() - 120, 20);
+    mReverseSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
+    
+    mWaveformComponent.setBounds(10, 220, getWidth() - 20, 200);
 }
 
 void MainContentComponent::paint(juce::Graphics& g)
 {
-    juce::Rectangle<int> thumbnailBounds (10, 220, getWidth()-20, 220);
     
-    if(mThumbnail.getNumChannels() == 0)
-    {
-        g.setColour(juce::Colours::darkgrey);
-        g.fillRect(thumbnailBounds);
-        g.setColour(juce::Colours::white);
-        g.drawFittedText("No file loaded", thumbnailBounds, juce::Justification::centred, 1);
-    }
-    else
-    {
-        g.setColour(juce::Colours::white);
-        g.fillRect(thumbnailBounds);
-        g.setColour(juce::Colours::red);
-        mThumbnail.drawChannels(g, thumbnailBounds, 0.0, mThumbnail.getTotalLength(), 1.0f);
-    }
 }
 
 void MainContentComponent::prepareToPlay (int, double)
@@ -239,7 +289,7 @@ void MainContentComponent::run()
 
 void MainContentComponent::changeListenerCallback(juce::ChangeBroadcaster* source)
 {
-    if(source == &mThumbnail)
+    if(source == &mWaveformComponent.getThumbnail())
     {
         repaint();
     }
@@ -249,27 +299,21 @@ void MainContentComponent::handleAsyncUpdate()
 {
     if(mFileSource != nullptr)
     {
-        mThumbnail.setSource(mFileSource.get());
+        mWaveformComponent.getThumbnail().setSource(mFileSource.get());
         mFileSource.release();
     }
 }
 
-void MainContentComponent::openButtonClicked()
+void MainContentComponent::newFileOpened(String& filePath)
 {
-    juce::FileChooser chooser {"Select an audio file shorter than " + juce::String(MAX_FILE_LENGTH) + " seconds to play...", {}, "*.wav, *.aif, *.aiff"};
-    if(chooser.browseForFileToOpen())
-    {
-        auto file = chooser.getResult();
-        auto path = file.getFullPathName();
-        mChosenPath.swapWith(path);
-        notify();
-    }
+    mChosenPath.swapWith(filePath);
+    notify();
 }
 
 void MainContentComponent::clearButtonClicked()
 {
     mCurrentBuffer = nullptr;
-    mThumbnail.clear();
+    mWaveformComponent.getThumbnail().clear();
 }
 
 void MainContentComponent::checkForPathToOpen()

@@ -80,9 +80,36 @@ public:
     
     // juce::AsyncUpdater
     void handleAsyncUpdate() override;
+    
+    void newFileOpened(String& filePath);
 
 private:
-    void openButtonClicked();
+    class WaveformComponent
+    : public juce::Component
+    , public juce::FileDragAndDropTarget
+    {
+    public:
+        WaveformComponent(MainContentComponent& parent, juce::AudioFormatManager& formatManager);
+        ~WaveformComponent() override;
+        
+        juce::AudioThumbnail& getThumbnail();
+        
+        // juce::Component
+        void resized() override;
+        void paint(juce::Graphics& g) override;
+        
+        // juce::FileDragAndDropTarget
+        bool isInterestedInFileDrag (const StringArray& files) override;
+        void filesDropped (const StringArray& files, int x, int y) override;
+        
+    private:
+        MainContentComponent& mParentComponent;
+        
+        juce::AudioFormatManager& mAudioFormatManager;
+        juce::AudioThumbnailCache mThumbnailCache;
+        juce::AudioThumbnail mThumbnail;
+    };
+    
     void clearButtonClicked();
     
     void checkForBuffersToFree();
@@ -90,7 +117,6 @@ private:
     
     void calculateAudioBlocks();
     //==========================================================================
-    juce::TextButton mOpenButton;
     juce::TextButton mClearButton;
     juce::ToggleButton mRandomSlicesToggle;
     juce::Label mmSampleBPMLabel;
@@ -103,13 +129,13 @@ private:
     juce::Slider mReverseSampleProbabilitySlider;
 
     juce::AudioFormatManager mFormatManager;
-    juce::AudioThumbnailCache mThumbnailCache { 5 };
-    juce::AudioThumbnail mThumbnail { 512, mFormatManager, mThumbnailCache };
     
     std::unique_ptr<juce::FileInputSource> mFileSource;
     
     juce::ReferenceCountedArray<ReferenceCountedForwardAndReverseBuffer> mBuffers;
     ReferenceCountedForwardAndReverseBuffer::Ptr mCurrentBuffer;
+    
+    WaveformComponent mWaveformComponent { *this, mFormatManager };
     
     juce::String mChosenPath;
     

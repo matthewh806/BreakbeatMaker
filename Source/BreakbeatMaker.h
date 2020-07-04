@@ -114,8 +114,10 @@ private:
 };
 
 class MainContentComponent
-: public AudioAppComponent
+: public juce::AudioAppComponent
 , private juce::Thread
+, private juce::ChangeListener
+, private juce::AsyncUpdater
 {
 public:
     MainContentComponent()
@@ -215,10 +217,11 @@ public:
             mReverseSampleThreshold = 1.0 - mReverseSampleProbabilitySlider.getValue();
         };
         
-        setSize (500, 200);
+        setSize (500, 440);
 
         mFormatManager.registerBasicFormats();
         setAudioChannels (0, 2);
+        mThumbnail.addChangeListener(this);
         
         startThread();
     }
@@ -280,6 +283,9 @@ public:
 
                 mSampleToEndOn = static_cast<int>(reader->lengthInSamples);
                 calculateAudioBlocks();
+                
+                mFileSource = std::make_unique<juce::FileInputSource>(file);
+                triggerAsyncUpdate();
             }
             else
             {
@@ -375,6 +381,43 @@ public:
         mChangeSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
         mReverseSampleProbabilitySlider.setBounds(100, 190, getWidth() - 120, 20);
     }
+    
+    void paint(juce::Graphics& g) override
+    {
+        juce::Rectangle<int> thumbnailBounds (10, 220, getWidth()-20, 220);
+        
+        if(mThumbnail.getNumChannels() == 0)
+        {
+            g.setColour(juce::Colours::darkgrey);
+            g.fillRect(thumbnailBounds);
+            g.setColour(juce::Colours::white);
+            g.drawFittedText("No file loaded", thumbnailBounds, juce::Justification::centred, 1);
+        }
+        else
+        {
+            g.setColour(juce::Colours::white);
+            g.fillRect(thumbnailBounds);
+            g.setColour(juce::Colours::red);
+            mThumbnail.drawChannels(g, thumbnailBounds, 0.0, mThumbnail.getTotalLength(), 1.0f);
+        }
+    }
+    
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override
+    {
+        if(source == &mThumbnail)
+        {
+            repaint();
+        }
+    }
+    
+    void handleAsyncUpdate() override
+    {
+        if(mFileSource != nullptr)
+        {
+            mThumbnail.setSource(mFileSource.get());
+            mFileSource.release();
+        }
+    }
 
 private:
     void mOpenButtonClicked()
@@ -392,6 +435,7 @@ private:
     void mClearButtonClicked()
     {
         mCurrentBuffer = nullptr;
+        mThumbnail.clear();
     }
     
     void calculateAudioBlocks()
@@ -433,19 +477,23 @@ private:
     }
 
     //==========================================================================
-    TextButton mOpenButton;
-    TextButton mClearButton;
-    ToggleButton mRandomSlicesToggle;
-    Label mmSampleBPMLabel;
-    Label mmSampleBPMField;
-    Label mSliceSizeLabel;
-    ComboBox mSliceSizeDropDown;
-    Label mChangeSampleProbabilityLabel;
-    Slider mChangeSampleProbabilitySlider;
-    Label mReverseSampleProbabilityLabel;
-    Slider mReverseSampleProbabilitySlider;
+    juce::TextButton mOpenButton;
+    juce::TextButton mClearButton;
+    juce::ToggleButton mRandomSlicesToggle;
+    juce::Label mmSampleBPMLabel;
+    juce::Label mmSampleBPMField;
+    juce::Label mSliceSizeLabel;
+    juce::ComboBox mSliceSizeDropDown;
+    juce::Label mChangeSampleProbabilityLabel;
+    juce::Slider mChangeSampleProbabilitySlider;
+    juce::Label mReverseSampleProbabilityLabel;
+    juce::Slider mReverseSampleProbabilitySlider;
 
-    AudioFormatManager mFormatManager;
+    juce::AudioFormatManager mFormatManager;
+    juce::AudioThumbnailCache mThumbnailCache { 5 };
+    juce::AudioThumbnail mThumbnail { 512, mFormatManager, mThumbnailCache };
+    
+    std::unique_ptr<juce::FileInputSource> mFileSource;
     
     juce::ReferenceCountedArray<ReferenceCountedForwardAndReverseBuffer> mBuffers;
     ReferenceCountedForwardAndReverseBuffer::Ptr mCurrentBuffer;

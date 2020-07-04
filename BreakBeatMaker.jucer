@@ -5,6 +5,10 @@
               defines="" projectType="guiapp" id="bdaxv8" jucerVersion="5.4.7">
   <MAINGROUP id="P1CWFa" name="BreakbeatMaker">
     <GROUP id="{83BE4DF2-9314-F02F-05A2-1A75A15D64E5}" name="Source">
+      <FILE id="wwxPHE" name="ReferenceCountedForwardAndReverseBuffer.cpp"
+            compile="1" resource="0" file="Source/ReferenceCountedForwardAndReverseBuffer.cpp"/>
+      <FILE id="oTMARG" name="ReferenceCountedForwardAndReverseBuffer.h"
+            compile="0" resource="0" file="Source/ReferenceCountedForwardAndReverseBuffer.h"/>
       <FILE id="JlolM5" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="DkW8Ki" name="BreakbeatMaker.h" compile="0" resource="0"
             file="Source/BreakbeatMaker.h"/>

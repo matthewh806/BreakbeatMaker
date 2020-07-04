@@ -48,70 +48,10 @@
 #pragma once
 
 #include <iostream>
+#include "ReferenceCountedForwardAndReverseBuffer.h"
 //==============================================================================
 
 #define MAX_FILE_LENGTH 15.0 // seconds
-
-class ReferenceCountedForwardAndReverseBuffer
-: public juce::ReferenceCountedObject
-{
-public:
-    typedef juce::ReferenceCountedObjectPtr<ReferenceCountedForwardAndReverseBuffer> Ptr;
-    
-    ReferenceCountedForwardAndReverseBuffer(const juce::String& nameToUse, juce::AudioFormatReader* formatReader)
-    : mName(nameToUse)
-    , mForwardBuffer(formatReader->numChannels, static_cast<int>(formatReader->lengthInSamples))
-    , mReverseBuffer(formatReader->numChannels, static_cast<int>(formatReader->lengthInSamples))
-    {
-        std::cout << "Buffer named: '" << mName << "' constructed. numChannels: " << formatReader->numChannels << ", numSamples" << formatReader->lengthInSamples << "\n";
-        formatReader->read(&mForwardBuffer, 0, static_cast<int>(formatReader->lengthInSamples), 0, true, true);
-        
-        for(auto ch = 0; ch < mReverseBuffer.getNumChannels(); ++ch)
-        {
-            mReverseBuffer.copyFrom(ch, 0, mForwardBuffer, ch, 0, mReverseBuffer.getNumSamples());
-            mReverseBuffer.reverse(ch, 0, mReverseBuffer.getNumSamples());
-        }
-        
-        mActiveBuffer = &mForwardBuffer;
-    }
-    
-    ~ReferenceCountedForwardAndReverseBuffer()
-    {
-        std::cout << "Buffer named: '" << mName << "' destroyed." << "\n";
-    }
-    
-    int getPosition() const
-    {
-        return mPosition;
-    }
-    
-    void setPosition(int pos)
-    {
-        mPosition = pos;
-    }
-    
-    void updateCurrentSampleBuffer(float reverseThreshold)
-    {
-        auto reversePerc = Random::getSystemRandom().nextFloat();
-        mActiveBuffer = reversePerc > reverseThreshold ? &mReverseBuffer : &mForwardBuffer;
-    }
-    
-    juce::AudioSampleBuffer* getCurrentAudioSampleBuffer()
-    {
-        return mActiveBuffer;
-    }
-    
-private:
-    juce::String mName;
-    juce::AudioSampleBuffer mForwardBuffer;
-    juce::AudioSampleBuffer mReverseBuffer;
-    
-    juce::AudioSampleBuffer* mActiveBuffer;
-    
-    int mPosition = 0;
-    
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ReferenceCountedForwardAndReverseBuffer)
-};
 
 class MainContentComponent
 : public juce::AudioAppComponent

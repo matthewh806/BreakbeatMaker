@@ -57,6 +57,12 @@ void MainContentComponent::WaveformComponent::paint(juce::Graphics& g)
 
 bool MainContentComponent::WaveformComponent::isInterestedInFileDrag (const StringArray& files)
 {
+    for(auto fileName : files)
+    {
+        if(!fileName.endsWith(".wav") && !fileName.endsWith(".aif") && !fileName.endsWith(".aiff"))
+            return false;
+    }
+    
     return true;
 }
 

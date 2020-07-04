@@ -87,12 +87,15 @@ private:
     class WaveformComponent
     : public juce::Component
     , public juce::FileDragAndDropTarget
+    , private juce::AsyncUpdater
     {
     public:
         WaveformComponent(MainContentComponent& parent, juce::AudioFormatManager& formatManager);
         ~WaveformComponent() override;
         
         juce::AudioThumbnail& getThumbnail();
+        
+        void setSampleStartEnd(int start, int end);
         
         // juce::Component
         void resized() override;
@@ -102,12 +105,20 @@ private:
         bool isInterestedInFileDrag (const StringArray& files) override;
         void filesDropped (const StringArray& files, int x, int y) override;
         
+        // juce::AsyncUpdater
+        void handleAsyncUpdate() override;
+        
     private:
         MainContentComponent& mParentComponent;
         
         juce::AudioFormatManager& mAudioFormatManager;
         juce::AudioThumbnailCache mThumbnailCache;
         juce::AudioThumbnail mThumbnail;
+        
+        int mStartSample = 0;
+        int mEndSample = 0;
+        
+        double mSampleRate = 44100.0;
     };
     
     void clearButtonClicked();

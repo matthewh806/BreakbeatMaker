@@ -16,7 +16,6 @@ MainContentComponent::WaveformComponent::WaveformComponent(MainContentComponent&
 , mThumbnailCache(5)
 , mThumbnail(512, mAudioFormatManager, mThumbnailCache)
 {
-    
 }
 
 MainContentComponent::WaveformComponent::~WaveformComponent()
@@ -28,6 +27,14 @@ MainContentComponent::WaveformComponent::~WaveformComponent()
 juce::AudioThumbnail& MainContentComponent::WaveformComponent::getThumbnail()
 {
     return mThumbnail;
+}
+
+void MainContentComponent::WaveformComponent::setSampleStartEnd(int start, int end)
+{
+    mStartSample = std::max(start, 0);
+    mEndSample = std::min(end, static_cast<int>(mThumbnail.getTotalLength() * mSampleRate));
+    
+    triggerAsyncUpdate();
 }
 
 void MainContentComponent::WaveformComponent::resized()
@@ -53,6 +60,25 @@ void MainContentComponent::WaveformComponent::paint(juce::Graphics& g)
         g.setColour(juce::Colours::red);
         mThumbnail.drawChannels(g, thumbnailBounds, 0.0, mThumbnail.getTotalLength(), 1.0f);
     }
+    
+    juce::Range<int> sampleRange { mStartSample, mEndSample };
+    if(sampleRange.getLength() == 0)
+    {
+        return;
+    }
+    
+    auto const sampleStartRatio = static_cast<double>(sampleRange.getStart() / mSampleRate) / mThumbnail.getTotalLength();
+    auto const sampleSizeRatio = static_cast<double>(sampleRange.getLength() / mSampleRate) / mThumbnail.getTotalLength();
+    
+    juce::Rectangle<int> clipBounds {
+        thumbnailBounds.getX() + static_cast<int>(thumbnailBounds.getWidth() * sampleStartRatio),
+        thumbnailBounds.getY(),
+        static_cast<int>(thumbnailBounds.getWidth() * sampleSizeRatio),
+        thumbnailBounds.getHeight()
+    };
+    
+    g.setColour(juce::Colours::blue.withAlpha(0.4f));
+    g.fillRect(clipBounds);
 }
 
 bool MainContentComponent::WaveformComponent::isInterestedInFileDrag (const StringArray& files)
@@ -79,6 +105,11 @@ void MainContentComponent::WaveformComponent::filesDropped (const StringArray& f
         auto path = f.getFullPathName();
         mParentComponent.newFileOpened(path);
     }
+}
+
+void MainContentComponent::WaveformComponent::handleAsyncUpdate()
+{
+    repaint();
 }
 
 MainContentComponent::MainContentComponent()
@@ -265,6 +296,8 @@ void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& buff
                 position = std::min(blockSampleSize * blockIdx, currentAudioSampleBuffer->getNumSamples());
                 // TODO check why it was out of range in the first place. Thread issues?
                 sampleToEndOn = std::min(position + blockSampleSize, currentAudioSampleBuffer->getNumSamples());
+                
+                mWaveformComponent.setSampleStartEnd(position, sampleToEndOn);
             }
             else
             {

@@ -90,6 +90,9 @@ void BreakbeatAudioSource::getNextAudioBlock (const AudioSourceChannelInfo& buff
     auto sourceEnd = mEndReadPosition.load();
     auto const readPosition = mNextReadPosition.load();
     
+    auto const sampleChangeThreshold = mSampleChangeThreshold.load();
+    auto const sampleReversedThreshold = mReverseSampleThreshold.load();
+    
     auto blockIdx = mBlockIdx.load();
     auto blockSampleSize = mBlockSampleSize.load();
     auto numAudioBlocks = mNumAudioBlocks.load();
@@ -101,6 +104,7 @@ void BreakbeatAudioSource::getNextAudioBlock (const AudioSourceChannelInfo& buff
     auto samplesRemaining = numSamples;
     auto innerStart = readPosition;
     auto innerBufferSample = outputStart;
+    
     while(samplesRemaining > 0)
     {
         auto newPos = innerStart == sourceEnd;
@@ -139,6 +143,7 @@ void BreakbeatAudioSource::getNextAudioBlock (const AudioSourceChannelInfo& buff
             }
             
             newPos = false;
+            retainedBuffer->updateCurrentSampleBuffer(sampleReversedThreshold);
             
             continue;
         }

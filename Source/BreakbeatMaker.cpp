@@ -121,7 +121,7 @@ MainContentComponent::MainContentComponent()
     
     addAndMakeVisible (mRandomSlicesToggle);
     mRandomSlicesToggle.setButtonText("Random Slices");
-    mRandomSlicesToggle.onClick = [this] { mRandomPosition = !mRandomPosition; };
+    mRandomSlicesToggle.onClick = [this] { mAudioSource.toggleRandomPosition(); };
     
     addAndMakeVisible(mmSampleBPMLabel);
     mmSampleBPMLabel.setText("Sample BPM: ", dontSendNotification);
@@ -137,7 +137,7 @@ MainContentComponent::MainContentComponent()
     mmSampleBPMField.onTextChange = [this]
     {
         mSampleBPM = mmSampleBPMField.getText().getIntValue();
-        calculateAudioBlocks();
+        mAudioSource.calculateAudioBlocks(mSampleBPM);
     };
     mmSampleBPMField.onEditorShow = [this]
     {
@@ -172,7 +172,8 @@ MainContentComponent::MainContentComponent()
                 break;
         }
         
-        calculateAudioBlocks();
+        mAudioSource.setBlockDivisionFactor(mBlockDivisionPower);
+        mAudioSource.calculateAudioBlocks(mmSampleBPMField.getText().getIntValue());
     };
     
     addAndMakeVisible(mChangeSampleProbabilityLabel);
@@ -188,6 +189,7 @@ MainContentComponent::MainContentComponent()
     mChangeSampleProbabilitySlider.onValueChange = [this]()
     {
         mSampleChangeThreshold = 1.0 - mChangeSampleProbabilitySlider.getValue();
+        mAudioSource.setSampleChangeThreshold(mSampleChangeThreshold);
     };
     
     addAndMakeVisible(mReverseSampleProbabilityLabel);
@@ -203,6 +205,7 @@ MainContentComponent::MainContentComponent()
     mReverseSampleProbabilitySlider.onValueChange = [this]()
     {
         mReverseSampleThreshold = 1.0 - mReverseSampleProbabilitySlider.getValue();
+        mAudioSource.setReverseSampleThreshold(mReverseSampleThreshold) ;
     };
     
     addAndMakeVisible(mWaveformComponent);
@@ -240,89 +243,20 @@ void MainContentComponent::paint(juce::Graphics& g)
     
 }
 
-void MainContentComponent::prepareToPlay (int, double)
+void MainContentComponent::prepareToPlay (int samplerPerBlockExpected, double sampleRate)
 {
-    
+    mAudioSource.prepareToPlay(samplerPerBlockExpected, sampleRate);
 }
 
 void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill)
 {
     bufferToFill.clearActiveBufferRegion();
-    ReferenceCountedForwardAndReverseBuffer::Ptr retainedBuffer(mCurrentBuffer);
-    
-    if(retainedBuffer == nullptr)
-    {
-        return;
-    }
-    
-    auto sampleToEndOn = mSampleToEndOn.load();
-    auto blockIdx = mBlockIdx.load();
-    auto const blockSampleSize = mBlockSampleSize.load();
-    auto const numAudioBlocks = mNumAudioBlocks.load();
-    auto position = retainedBuffer->getPosition(); // loads atomically
-    
-    auto* currentAudioSampleBuffer = retainedBuffer->getCurrentAudioSampleBuffer();
-    
-    auto const numInputChannels = currentAudioSampleBuffer->getNumChannels();
-    auto const numOutputChannels = bufferToFill.buffer->getNumChannels();
-    
-    auto outputSamplesRemaining = bufferToFill.numSamples;
-    auto outputSamplesOffset = bufferToFill.startSample;
-    
-    bool changeDirection = false;
-    
-    while(outputSamplesRemaining > 0)
-    {
-        auto bufferSamplesRemaining = std::max(sampleToEndOn - position, 0);
-        auto samplesThisTime = std::min(outputSamplesRemaining, bufferSamplesRemaining);
-        
-        for(auto ch = 0; ch < numOutputChannels; ++ch)
-        {
-            bufferToFill.buffer->copyFrom(ch, outputSamplesOffset, *currentAudioSampleBuffer, ch % numInputChannels, position, samplesThisTime);
-        }
-        
-        outputSamplesRemaining -= samplesThisTime;
-        outputSamplesOffset += samplesThisTime;
-        position += samplesThisTime;
-        
-        if(position >= sampleToEndOn)
-        {
-            if(mRandomPosition)
-            {
-                auto changePerc = Random::getSystemRandom().nextFloat();
-                blockIdx = changePerc > mSampleChangeThreshold ? Random::getSystemRandom().nextInt(numAudioBlocks) : blockIdx;
-                    
-                // Move that many blocks along the fileBuffer
-                position = std::min(blockSampleSize * blockIdx, currentAudioSampleBuffer->getNumSamples());
-                // TODO check why it was out of range in the first place. Thread issues?
-                sampleToEndOn = std::min(position + blockSampleSize, currentAudioSampleBuffer->getNumSamples());
-                
-                mWaveformComponent.setSampleStartEnd(position, sampleToEndOn);
-            }
-            else
-            {
-                position = 0;
-                sampleToEndOn = currentAudioSampleBuffer->getNumSamples();
-            }
-            
-            changeDirection = true;
-        }
-    }
-    
-    mSampleToEndOn.exchange(sampleToEndOn);
-    mBlockIdx.exchange(blockIdx);
-    retainedBuffer->setPosition(position);
-    
-    if(changeDirection)
-    {
-        changeDirection = false;
-        retainedBuffer->updateCurrentSampleBuffer(mReverseSampleThreshold);
-    }
+    mAudioSource.getNextAudioBlock(bufferToFill);
 }
 
 void MainContentComponent::releaseResources()
 {
-    mCurrentBuffer = nullptr;
+    mAudioSource.releaseResources();
 }
 
 void MainContentComponent::run()
@@ -360,7 +294,7 @@ void MainContentComponent::newFileOpened(String& filePath)
 
 void MainContentComponent::clearButtonClicked()
 {
-    mCurrentBuffer = nullptr;
+    mAudioSource.clear();
     mWaveformComponent.getThumbnail().clear();
 }
 
@@ -380,18 +314,11 @@ void MainContentComponent::checkForPathToOpen()
     if(reader != nullptr)
     {
         // get length
-        mDuration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
+        auto duration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
         
-        if(mDuration < MAX_FILE_LENGTH)
+        if(duration < MAX_FILE_LENGTH)
         {
-            ReferenceCountedForwardAndReverseBuffer::Ptr newBuffer = new ReferenceCountedForwardAndReverseBuffer(file.getFileName(), reader.get());
-            
-            mCurrentBuffer = newBuffer;
-            mBuffers.add(mCurrentBuffer);
-
-            mSampleToEndOn = static_cast<int>(reader->lengthInSamples);
-            calculateAudioBlocks();
-            
+            mAudioSource.setReader(reader.get());
             mFileSource = std::make_unique<juce::FileInputSource>(file);
             triggerAsyncUpdate();
         }
@@ -399,59 +326,13 @@ void MainContentComponent::checkForPathToOpen()
         {
              juce::AlertWindow::showMessageBox(juce::AlertWindow::WarningIcon,
                                           juce::translate("Audio file too long!"),
-                                               juce::translate("The file is ") + juce::String(mDuration) + juce::translate("seconds long. ") + juce::String(MAX_FILE_LENGTH) + "Second limit!");
+                                               juce::translate("The file is ") + juce::String(duration) + juce::translate("seconds long. ") + juce::String(MAX_FILE_LENGTH) + "Second limit!");
         }
         
     }
-}
-
-void MainContentComponent::calculateAudioBlocks()
-{
-    ReferenceCountedForwardAndReverseBuffer::Ptr retainedBuffer(mCurrentBuffer);
-    if(retainedBuffer == nullptr)
-    {
-        mNumAudioBlocks = 1;
-        
-        // TODO: What was my intention here...? Its odd mBlockSampleSize = 0?
-        mBlockSampleSize = 0;
-        return;
-    }
-    
-    auto* currentAudioBuffer = retainedBuffer->getCurrentAudioSampleBuffer();
-    if(currentAudioBuffer == nullptr)
-    {
-        mNumAudioBlocks = 1;
-                   
-        // TODO: What was my intention here...? Its odd mBlockSampleSize = 0?
-        mBlockSampleSize = 0;
-        return;
-    }
-
-    auto const numSrcSamples = currentAudioBuffer->getNumSamples();
-    if(numSrcSamples == 0)
-    {
-        mNumAudioBlocks = 1;
-        
-        // TODO: What was my intention here...? Its odd mBlockSampleSize = 0?
-        mBlockSampleSize = retainedBuffer->getCurrentAudioSampleBuffer()->getNumSamples();
-        return;
-    }
-    
-    // length, bpm
-    auto bps = mSampleBPM / 60.0;
-    mNumAudioBlocks = std::max(bps * mDuration / static_cast<double>(mBlockDivisionPower), 1.0);
-    mBlockSampleSize = roundToInt(numSrcSamples / mNumAudioBlocks);
 }
 
 void MainContentComponent::checkForBuffersToFree()
 {
-    for(auto i = mBuffers.size(); --i >= 0;)
-    {
-        ReferenceCountedForwardAndReverseBuffer::Ptr buffer(mBuffers.getUnchecked(i));
-        
-        if(buffer->getReferenceCount() == 2)
-        {
-            mBuffers.remove(i);
-        }
-    }
+    mAudioSource.clearFreeBuffers();
 }

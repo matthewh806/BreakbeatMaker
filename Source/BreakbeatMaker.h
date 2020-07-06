@@ -49,6 +49,7 @@
 
 #include <iostream>
 #include "ReferenceCountedForwardAndReverseBuffer.h"
+#include "BreakbeatAudioSource.h"
 //==============================================================================
 
 #define MAX_FILE_LENGTH 15.0 // seconds
@@ -125,8 +126,6 @@ private:
     
     void checkForBuffersToFree();
     void checkForPathToOpen();
-    
-    void calculateAudioBlocks();
     //==========================================================================
     juce::TextButton mClearButton;
     juce::ToggleButton mRandomSlicesToggle;
@@ -143,8 +142,7 @@ private:
     
     std::unique_ptr<juce::FileInputSource> mFileSource;
     
-    juce::ReferenceCountedArray<ReferenceCountedForwardAndReverseBuffer> mBuffers;
-    ReferenceCountedForwardAndReverseBuffer::Ptr mCurrentBuffer;
+    BreakbeatAudioSource mAudioSource;
     
     WaveformComponent mWaveformComponent { *this, mFormatManager };
     
@@ -156,11 +154,6 @@ private:
     float mSampleChangeThreshold = 0.7;
     float mReverseSampleThreshold = 0.7;
     
-    float mDuration = 44100.0;
-    std::atomic<int> mNumAudioBlocks {1};
-    std::atomic<int> mSampleToEndOn;
-    std::atomic<int> mBlockSampleSize {1}; // in samples
-    std::atomic<int> mBlockIdx {0};
     double mBlockDivisionPower = 1.0; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)

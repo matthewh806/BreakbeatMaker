@@ -61,7 +61,7 @@ class MainContentComponent
 , private juce::AsyncUpdater
 {
 public:
-    MainContentComponent();
+    MainContentComponent(juce::RecentlyOpenedFilesList& recentFiles);
     ~MainContentComponent() override;
     
     // juce::Component
@@ -158,7 +158,8 @@ private:
     double mFileSampleRate;
     
     TransportState mState;
-
+    
+    juce::RecentlyOpenedFilesList& mRecentFiles;
     juce::AudioFormatManager mFormatManager;
     
     std::unique_ptr<juce::FileInputSource> mFileSource;

@@ -112,8 +112,9 @@ void MainContentComponent::WaveformComponent::handleAsyncUpdate()
     repaint();
 }
 
-MainContentComponent::MainContentComponent()
+MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recentFiles)
 : juce::Thread("Background Thread")
+, mRecentFiles(recentFiles)
 {
     addAndMakeVisible (mClearButton);
     mClearButton.setButtonText ("Clear");
@@ -393,6 +394,7 @@ void MainContentComponent::checkForPathToOpen()
             
             mFileName = file.getFileName();
             mFileSampleRate = reader->sampleRate;
+            mRecentFiles.addFile(file);
             
             triggerAsyncUpdate();
         }

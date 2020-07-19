@@ -5,6 +5,9 @@
               defines="" projectType="guiapp" id="bdaxv8" jucerVersion="5.4.7">
   <MAINGROUP id="P1CWFa" name="BreakbeatMaker">
     <GROUP id="{83BE4DF2-9314-F02F-05A2-1A75A15D64E5}" name="Source">
+      <FILE id="AEEx0g" name="FileRecorder.cpp" compile="1" resource="0"
+            file="Source/FileRecorder.cpp"/>
+      <FILE id="CTWvyP" name="FileRecorder.h" compile="0" resource="0" file="Source/FileRecorder.h"/>
       <FILE id="Jrcu36" name="BreakbeatAudioSource.cpp" compile="1" resource="0"
             file="Source/BreakbeatAudioSource.cpp"/>
       <FILE id="KRhfyK" name="BreakbeatAudioSource.h" compile="0" resource="0"

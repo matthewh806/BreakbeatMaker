@@ -85,6 +85,14 @@ public:
     void newFileOpened(String& filePath);
 
 private:
+    enum class TransportState
+    {
+        Stopped,
+        Starting,
+        Playing,
+        Stopping
+    };
+    
     class WaveformComponent
     : public juce::Component
     , public juce::FileDragAndDropTarget
@@ -126,6 +134,8 @@ private:
     
     void checkForBuffersToFree();
     void checkForPathToOpen();
+    
+    void changeState(TransportState state);
     //==========================================================================
     juce::TextButton mClearButton;
     juce::ToggleButton mRandomSlicesToggle;
@@ -137,12 +147,24 @@ private:
     juce::Slider mChangeSampleProbabilitySlider;
     juce::Label mReverseSampleProbabilityLabel;
     juce::Slider mReverseSampleProbabilitySlider;
+    
+    juce::Label mFileNameLabel;
+    juce::Label mFileSampleRateLabel;
+    
+    juce::TextButton mStopButton;
+    juce::TextButton mPlayButton;
+        
+    juce::String mFileName;
+    double mFileSampleRate;
+    
+    TransportState mState;
 
     juce::AudioFormatManager mFormatManager;
     
     std::unique_ptr<juce::FileInputSource> mFileSource;
     
     BreakbeatAudioSource mAudioSource;
+    juce::AudioTransportSource mTransportSource;
     
     WaveformComponent mWaveformComponent { *this, mFormatManager };
     

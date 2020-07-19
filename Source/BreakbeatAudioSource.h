@@ -21,7 +21,7 @@ class PositionableRegionAudioSource
 };
 
 class BreakbeatAudioSource
-: PositionableRegionAudioSource
+: public PositionableRegionAudioSource
 {
 public:
     BreakbeatAudioSource();

@@ -210,10 +210,32 @@ MainContentComponent::MainContentComponent()
     
     addAndMakeVisible(mWaveformComponent);
     
-    setSize (500, 440);
+    addAndMakeVisible(mStopButton);
+    mStopButton.setButtonText("Stop");
+    mStopButton.onClick = [this]()
+    {
+        changeState(TransportState::Stopping);
+    };
+    
+    addAndMakeVisible(mPlayButton);
+    mPlayButton.setButtonText("Play");
+    mPlayButton.onClick = [this]()
+    {
+        changeState(TransportState::Starting);
+    };
+    
+    addAndMakeVisible(mFileNameLabel);
+    mFileNameLabel.setEditable(false);
+    
+    addAndMakeVisible(mFileSampleRateLabel);
+    mFileSampleRateLabel.setEditable(false);
+    
+    setSize (500, 520);
 
     mFormatManager.registerBasicFormats();
     setAudioChannels (0, 2);
+    
+    mTransportSource.addChangeListener(this);
     
     mWaveformComponent.getThumbnail().addChangeListener(this);
     
@@ -236,6 +258,10 @@ void MainContentComponent::resized()
     mReverseSampleProbabilitySlider.setBounds(100, 160, getWidth() - 120, 20);
     
     mWaveformComponent.setBounds(10, 220, getWidth() - 20, 200);
+    mFileNameLabel.setBounds(10, 450, (getWidth() - 20) * 0.5, 20);
+    mFileSampleRateLabel.setBounds(getWidth() * 0.5 + 10, 450, (getWidth() - 20) * 0.5, 20);
+    mPlayButton.setBounds(10, 480, (getWidth() - 20) * 0.5, 20);
+    mStopButton.setBounds(getWidth() * 0.5 + 10, 480, (getWidth() - 20) * 0.5, 20);
 }
 
 void MainContentComponent::paint(juce::Graphics& g)
@@ -246,17 +272,19 @@ void MainContentComponent::paint(juce::Graphics& g)
 void MainContentComponent::prepareToPlay (int samplerPerBlockExpected, double sampleRate)
 {
     mAudioSource.prepareToPlay(samplerPerBlockExpected, sampleRate);
+    mTransportSource.prepareToPlay(samplerPerBlockExpected, sampleRate);
 }
 
 void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill)
 {
     bufferToFill.clearActiveBufferRegion();
-    mAudioSource.getNextAudioBlock(bufferToFill);
+    mTransportSource.getNextAudioBlock(bufferToFill);
 }
 
 void MainContentComponent::releaseResources()
 {
     mAudioSource.releaseResources();
+    mTransportSource.releaseResources();
 }
 
 void MainContentComponent::run()
@@ -275,10 +303,17 @@ void MainContentComponent::changeListenerCallback(juce::ChangeBroadcaster* sourc
     {
         repaint();
     }
+    else if(source == &mTransportSource)
+    {
+        changeState(mTransportSource.isPlaying() ? TransportState::Playing : TransportState::Stopped);
+    }
 }
 
 void MainContentComponent::handleAsyncUpdate()
 {
+    mFileNameLabel.setText(mFileName, juce::NotificationType::dontSendNotification);
+    mFileSampleRateLabel.setText(juce::String(mFileSampleRate), juce::NotificationType::dontSendNotification);
+    
     if(mFileSource != nullptr)
     {
         mWaveformComponent.getThumbnail().setSource(mFileSource.get());
@@ -296,6 +331,41 @@ void MainContentComponent::clearButtonClicked()
 {
     mAudioSource.clear();
     mWaveformComponent.getThumbnail().clear();
+    
+    mFileName = "";
+    mFileSampleRate = 0.0;
+    
+    triggerAsyncUpdate();
+}
+
+void MainContentComponent::changeState(TransportState state)
+{
+    if(mState != state)
+    {
+        mState = state;
+        
+        switch(state)
+        {
+            case TransportState::Stopped:
+                mStopButton.setEnabled(false);
+                mPlayButton.setEnabled(true);
+                mTransportSource.setPosition(0.0);
+                mAudioSource.setNextReadPosition(0.0);
+                break;
+                
+            case TransportState::Starting:
+                mPlayButton.setEnabled(false);
+                mTransportSource.start();
+                break;
+                
+            case TransportState::Playing:
+                mStopButton.setEnabled(true);
+                break;
+                
+            case TransportState::Stopping:
+                mTransportSource.stop();
+        }
+    }
 }
 
 void MainContentComponent::checkForPathToOpen()
@@ -315,11 +385,15 @@ void MainContentComponent::checkForPathToOpen()
     {
         // get length
         auto duration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
-        
         if(duration < MAX_FILE_LENGTH)
         {
             mAudioSource.setReader(reader.get());
+            mTransportSource.setSource(&mAudioSource, 0, nullptr, reader->sampleRate);
             mFileSource = std::make_unique<juce::FileInputSource>(file);
+            
+            mFileName = file.getFileName();
+            mFileSampleRate = reader->sampleRate;
+            
             triggerAsyncUpdate();
         }
         else

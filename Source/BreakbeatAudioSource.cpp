@@ -114,7 +114,7 @@ void BreakbeatAudioSource::getNextAudioBlock (const AudioSourceChannelInfo& buff
         bool const atSliceEnd = readBufferStart == sliceEndPosition;
         bool const willChange = atSliceEnd && changePerc > sliceChangeThreshold;
         
-        sliceStartPosition = willChange ? static_cast<int>(Random::getSystemRandom().nextInt(numSlices - 1) * sliceSampleSize) : sliceStartPosition;
+        sliceStartPosition = willChange ? (numSlices > 1 ? Random::getSystemRandom().nextInt(numSlices) * sliceSampleSize : 0) : sliceStartPosition;
         sliceEndPosition = willChange ? sliceStartPosition + sliceSampleSize : sliceEndPosition;
         if(willChange)
         {
@@ -125,7 +125,7 @@ void BreakbeatAudioSource::getNextAudioBlock (const AudioSourceChannelInfo& buff
         
         readBufferStart = atSliceEnd ? sliceStartPosition : readBufferStart;
         auto const readBufferEnd = std::min(sliceEndPosition, readBufferStart + static_cast<int64_t>(samplesRemaining));
-        jassert(readBufferEnd >= readBufferStart);
+        jassert(readBufferStart >= 0 && readBufferEnd >= readBufferStart);
         
         auto const numThisTime = std::min(static_cast<int>(readBufferEnd - readBufferStart), samplesRemaining);
         for(auto ch = 0; ch < numChannels; ++ch)
@@ -182,6 +182,7 @@ int64 BreakbeatAudioSource::getEndReadPosition() const
 void BreakbeatAudioSource::setReader(juce::AudioFormatReader* reader)
 {
     ReferenceCountedForwardAndReverseBuffer::Ptr newBuffer = new ReferenceCountedForwardAndReverseBuffer("", reader);
+    jassert(newBuffer != nullptr);
             
     mCurrentBuffer = newBuffer;
     mBuffers.add(mCurrentBuffer);

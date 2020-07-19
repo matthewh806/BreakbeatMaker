@@ -315,6 +315,8 @@ void MainContentComponent::handleAsyncUpdate()
     mFileNameLabel.setText(mFileName, juce::NotificationType::dontSendNotification);
     mFileSampleRateLabel.setText(juce::String(mFileSampleRate), juce::NotificationType::dontSendNotification);
     
+    changeState(TransportState::Stopped);
+    
     if(mFileSource != nullptr)
     {
         mWaveformComponent.getThumbnail().setSource(mFileSource.get());
@@ -388,8 +390,8 @@ void MainContentComponent::checkForPathToOpen()
         auto duration = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
         if(duration < MAX_FILE_LENGTH)
         {
-            mAudioSource.setReader(reader.get());
             mTransportSource.setSource(&mAudioSource, 0, nullptr, reader->sampleRate);
+            mAudioSource.setReader(reader.get());
             mFileSource = std::make_unique<juce::FileInputSource>(file);
             
             mFileName = file.getFileName();

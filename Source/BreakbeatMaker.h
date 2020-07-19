@@ -62,6 +62,14 @@ class MainContentComponent
 , private juce::AsyncUpdater
 {
 public:
+    enum ColourIds
+    {
+        backgroundColourId      = 0x3004000,
+        playingButtonColourId   = 0x3004001,
+        recordingButtonColourId = 0x3004003,
+        defaultButtonColourId   = 0x3004002
+    };
+    
     MainContentComponent(juce::RecentlyOpenedFilesList& recentFiles);
     ~MainContentComponent() override;
     

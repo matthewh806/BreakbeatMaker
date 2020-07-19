@@ -117,6 +117,11 @@ MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recent
 , mRecentFiles(recentFiles)
 , mRecorder(mFormatManager)
 {
+    getLookAndFeel().setColour (MainContentComponent::ColourIds::backgroundColourId, juce::Colours::transparentBlack);
+    getLookAndFeel().setColour (MainContentComponent::ColourIds::playingButtonColourId, juce::Colours::green);
+    getLookAndFeel().setColour(MainContentComponent::ColourIds::defaultButtonColourId, findColour(juce::TextButton::ColourIds::buttonColourId));
+    getLookAndFeel().setColour(MainContentComponent::ColourIds::recordingButtonColourId, juce::Colours::red);
+    
     addAndMakeVisible (mClearButton);
     mClearButton.setButtonText ("Clear");
     mClearButton.onClick = [this] { clearButtonClicked(); };
@@ -234,10 +239,12 @@ MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recent
         if(mRecording)
         {
             mRecorder.startRecording(mRecordedFile, 2, 44100.0, 32);
+            mRecordButton.setColour(juce::TextButton::ColourIds::buttonColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::recordingButtonColourId));
         }
         else
         {
             mRecorder.stopRecording();
+            mRecordButton.setColour(juce::TextButton::ColourIds::buttonColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::defaultButtonColourId));
         }
     };
     
@@ -393,10 +400,20 @@ void MainContentComponent::changeState(TransportState state)
         switch(state)
         {
             case TransportState::Stopped:
+            {
                 mStopButton.setEnabled(false);
                 mPlayButton.setEnabled(true);
+                mPlayButton.setColour(juce::TextButton::ColourIds::buttonOnColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::defaultButtonColourId));
+                mPlayButton.setColour(juce::TextButton::ColourIds::buttonColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::defaultButtonColourId));
                 mTransportSource.setPosition(0.0);
                 mAudioSource.setNextReadPosition(0.0);
+                
+                if(mRecording)
+                {
+                    mRecorder.stopRecording();
+                    mRecordButton.setColour(juce::TextButton::ColourIds::buttonColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::defaultButtonColourId));
+                }
+            }
                 break;
                 
             case TransportState::Starting:
@@ -405,6 +422,8 @@ void MainContentComponent::changeState(TransportState state)
                 break;
                 
             case TransportState::Playing:
+                mPlayButton.setColour(juce::TextButton::ColourIds::buttonOnColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::playingButtonColourId));
+                mPlayButton.setColour(juce::TextButton::ColourIds::buttonColourId, getLookAndFeel().findColour(MainContentComponent::ColourIds::playingButtonColourId));
                 mStopButton.setEnabled(true);
                 break;
                 

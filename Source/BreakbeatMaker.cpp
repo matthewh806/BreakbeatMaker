@@ -29,10 +29,10 @@ juce::AudioThumbnail& MainContentComponent::WaveformComponent::getThumbnail()
     return mThumbnail;
 }
 
-void MainContentComponent::WaveformComponent::setSampleStartEnd(int start, int end)
+void MainContentComponent::WaveformComponent::setSampleStartEnd(int64_t start, int64_t end)
 {
-    mStartSample = std::max(start, 0);
-    mEndSample = std::min(end, static_cast<int>(mThumbnail.getTotalLength() * mSampleRate));
+    mStartSample = std::max(start, static_cast<int64_t>(0));
+    mEndSample = std::min(end, static_cast<int64_t>(mThumbnail.getTotalLength() * mSampleRate));
     
     triggerAsyncUpdate();
 }
@@ -61,7 +61,7 @@ void MainContentComponent::WaveformComponent::paint(juce::Graphics& g)
         mThumbnail.drawChannels(g, thumbnailBounds, 0.0, mThumbnail.getTotalLength(), 1.0f);
     }
     
-    juce::Range<int> sampleRange { mStartSample, mEndSample };
+    juce::Range<int64_t> sampleRange { mStartSample, mEndSample };
     if(sampleRange.getLength() == 0)
     {
         return;
@@ -280,6 +280,8 @@ void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& buff
 {
     bufferToFill.clearActiveBufferRegion();
     mTransportSource.getNextAudioBlock(bufferToFill);
+    
+    mWaveformComponent.setSampleStartEnd(mAudioSource.getStartReadPosition(), mAudioSource.getEndReadPosition());
 }
 
 void MainContentComponent::releaseResources()

@@ -29,6 +29,7 @@ public:
     
     int64_t getNumSamples();
     int64_t getStartReadPosition();
+    int64_t getEndReadPosition();
     
     void setSampleChangeThreshold(float threshold);
     void setReverseSampleThreshold(float threshold);

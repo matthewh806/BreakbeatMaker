@@ -42,6 +42,11 @@ int64_t BreakbeatAudioSource::getStartReadPosition()
     return mStartReadPosition.load();
 }
 
+int64_t BreakbeatAudioSource::getEndReadPosition()
+{
+    return mEndReadPosition.load();
+}
+
 void BreakbeatAudioSource::setSampleChangeThreshold(float threshold)
 {
     mSampleChangeThreshold.exchange(threshold);

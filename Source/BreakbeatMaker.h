@@ -104,7 +104,7 @@ private:
         
         juce::AudioThumbnail& getThumbnail();
         
-        void setSampleStartEnd(int start, int end);
+        void setSampleStartEnd(int64_t start, int64_t end);
         
         // juce::Component
         void resized() override;
@@ -124,8 +124,8 @@ private:
         juce::AudioThumbnailCache mThumbnailCache;
         juce::AudioThumbnail mThumbnail;
         
-        int mStartSample = 0;
-        int mEndSample = 0;
+        int64_t mStartSample = 0;
+        int64_t mEndSample = 0;
         
         double mSampleRate = 44100.0;
     };

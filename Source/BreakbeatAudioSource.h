@@ -35,6 +35,8 @@ public:
     
     void setBlockDivisionFactor(double factor);
     
+    void setSampleBpm(double bpm);
+    
     void toggleRandomPosition();
     void toggleRandomDirection();
     
@@ -59,7 +61,7 @@ public:
     void clearFreeBuffers();
     void clear();
     
-    void calculateAudioBlocks(int bpm);
+    void calculateAudioBlocks();
     
 private:
     
@@ -73,10 +75,11 @@ private:
     std::atomic<bool> mRandomPosition {false};
     std::atomic<bool> mRandomDirection {false};
     
-    std::atomic<int> mNumAudioBlocks {1};
+    std::atomic<int> mNumSlices {1};
     std::atomic<int> mSampleToEndOn;
-    std::atomic<int> mBlockSampleSize {1}; // in samples
+    std::atomic<int> mSliceSampleSize {1}; // in samples
     std::atomic<int> mBlockIdx {0};
+    std::atomic<int> mBpm {120};
     std::atomic<double> mBlockDivisionPower {1.0}; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
     
     double mDuration = 44100;

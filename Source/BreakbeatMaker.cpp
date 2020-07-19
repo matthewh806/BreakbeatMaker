@@ -138,7 +138,7 @@ MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recent
     mmSampleBPMField.onTextChange = [this]
     {
         mSampleBPM = mmSampleBPMField.getText().getIntValue();
-        mAudioSource.calculateAudioBlocks(mSampleBPM);
+        mAudioSource.setSampleBpm(static_cast<double>(mSampleBPM));
     };
     mmSampleBPMField.onEditorShow = [this]
     {
@@ -174,7 +174,7 @@ MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recent
         }
         
         mAudioSource.setBlockDivisionFactor(mBlockDivisionPower);
-        mAudioSource.calculateAudioBlocks(mmSampleBPMField.getText().getIntValue());
+        mAudioSource.calculateAudioBlocks();
     };
     
     addAndMakeVisible(mChangeSampleProbabilityLabel);

@@ -84,6 +84,7 @@ public:
     void handleAsyncUpdate() override;
     
     void newFileOpened(String& filePath);
+    void setFileOutputPath();
 
 private:
     enum class TransportState

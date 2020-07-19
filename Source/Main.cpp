@@ -53,7 +53,8 @@ public:
     
     enum CommandIds
     {
-        FileOpenRecent = 0x2002000
+        FileOpenRecent = 0x2002000,
+        OutputFilePath = 0x2002001
     };
     
     juce::ApplicationCommandTarget* getNextCommandTarget() override
@@ -65,7 +66,8 @@ public:
     {
         const juce::CommandID ids[] =
         {
-            CommandIds::FileOpenRecent
+            CommandIds::FileOpenRecent,
+            CommandIds::OutputFilePath
         };
         
         commands.addArray(ids, numElementsInArray(ids));
@@ -80,6 +82,13 @@ public:
                 result.setInfo("Open Recent File", "Open a recently used audio file", "File", 0);
                 result.setActive(mRecentFiles.getNumFiles() > 0);
             }
+                break;
+            case CommandIds::OutputFilePath:
+            {
+                result.setInfo("Set output path", "Set the output path to write recordings to", "File", 1);
+                result.setActive(true);
+            }
+                break;
         }
     }
     
@@ -89,6 +98,11 @@ public:
         {
             case CommandIds::FileOpenRecent:
             {
+                return true;
+            }
+            case CommandIds::OutputFilePath:
+            {
+                mContent.setFileOutputPath();
                 return true;
             }
         }

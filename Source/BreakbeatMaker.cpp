@@ -363,6 +363,16 @@ void MainContentComponent::newFileOpened(String& filePath)
     notify();
 }
 
+void MainContentComponent::setFileOutputPath()
+{
+    juce::FileChooser fileChooser ("Please select the location you'd like to record to...", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.wav");
+    
+    if(fileChooser.browseForFileToSave(true))
+    {
+        mRecordedFile = fileChooser.getResult();
+    }
+}
+
 void MainContentComponent::clearButtonClicked()
 {
     mAudioSource.clear();

@@ -24,9 +24,15 @@ public:
             juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
             .getChildFile("Application Support").getChildFile("toous").getChildFile("BreakbeatMaker.xml");
         
+        mCommandManager.registerAllCommandsForTarget(this);
         loadProperties();
         
         mMainWindow = std::make_unique<MainWindow>("BreakbeatMaker", &mContent, *this);
+        
+        mMenuModel.setApplicationCommandManagerToWatch(&mCommandManager);
+        #if JUCE_MAC && (!defined(JUCE_IOS))
+                juce::MenuBarModel::setMacMainMenu(&mMenuModel, nullptr);
+        #endif
         
         juce::MessageManager::callAsync([this]()
         {
@@ -40,6 +46,54 @@ public:
     void shutdown() override
     {
         saveProperties();
+        #if JUCE_MAC && (!defined(JUCE_IOS))
+                juce::MenuBarModel::setMacMainMenu(nullptr);
+        #endif
+    }
+    
+    enum CommandIds
+    {
+        FileOpenRecent = 0x2002000
+    };
+    
+    juce::ApplicationCommandTarget* getNextCommandTarget() override
+    {
+        return nullptr;
+    }
+    
+    void getAllCommands(juce::Array<juce::CommandID>& commands) override
+    {
+        const juce::CommandID ids[] =
+        {
+            CommandIds::FileOpenRecent
+        };
+        
+        commands.addArray(ids, numElementsInArray(ids));
+    }
+    
+    void getCommandInfo(juce::CommandID commandID, juce::ApplicationCommandInfo& result) override
+    {
+        switch(commandID)
+        {
+            case CommandIds::FileOpenRecent:
+            {
+                result.setInfo("Open Recent File", "Open a recently used audio file", "File", 0);
+                result.setActive(mRecentFiles.getNumFiles() > 0);
+            }
+        }
+    }
+    
+    bool perform(juce::ApplicationCommandTarget::InvocationInfo const& info) override
+    {
+        switch(info.commandID)
+        {
+            case CommandIds::FileOpenRecent:
+            {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
 private:
@@ -78,6 +132,65 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };
     
+    class MainMenuModel
+    : public juce::MenuBarModel
+    {
+    public:
+        MainMenuModel() {}
+        ~MainMenuModel() override = default;
+        
+        juce::StringArray getMenuBarNames() override
+        {
+            auto& commandManager = getCommandManager();
+            return commandManager.getCommandCategories();
+        }
+        
+        juce::PopupMenu getMenuForIndex(int index, juce::String const& categoryName) override
+        {
+            juce::PopupMenu menu;
+            
+            auto& commandManager = getCommandManager();
+            auto const commandIds = commandManager.getCommandsInCategory(categoryName);
+            for(auto const commandId : commandIds)
+            {
+                if(commandId == CommandIds::FileOpenRecent)
+                {
+                    PopupMenu recentFilesMenu;
+                    getApp().mRecentFiles.createPopupMenuItems(recentFilesMenu, static_cast<int>(CommandIds::FileOpenRecent) + 1, false, true);
+                    menu.addSubMenu("Open recent file", recentFilesMenu);
+                }
+                else
+                {
+                    menu.addCommandItem(&commandManager, commandId);
+                }
+            }
+            
+            return menu;
+        }
+        
+        void menuItemSelected(int itemId, int index) override
+        {
+            if(itemId >= static_cast<int>(CommandIds::FileOpenRecent) + 1)
+            {
+                auto& app = getApp();
+                auto file = app.mRecentFiles.getFile(itemId - (static_cast<int>(CommandIds::FileOpenRecent) - 1));
+                
+                auto path = file.getFullPathName();
+                app.mContent.newFileOpened(path);
+            }
+        }
+    };
+    
+    static Application& getApp()
+    {
+        return *dynamic_cast<Application*>(JUCEApplication::getInstance());
+    }
+    
+    static juce::ApplicationCommandManager& getCommandManager()
+    {
+        return getApp().mCommandManager;
+    }
+    
     void saveProperties()
     {
         auto xml = std::make_unique<juce::XmlElement>("BreakbeatMaker");
@@ -105,6 +218,10 @@ private:
     }
 
     std::unique_ptr<MainWindow> mMainWindow;
+    MainMenuModel mMenuModel;
+    
+    juce::ApplicationCommandManager mCommandManager;
+    
     juce::RecentlyOpenedFilesList mRecentFiles;
     MainContentComponent mContent {mRecentFiles};
     

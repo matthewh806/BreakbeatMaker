@@ -50,6 +50,7 @@
 #include <iostream>
 #include "ReferenceCountedForwardAndReverseBuffer.h"
 #include "BreakbeatAudioSource.h"
+#include "FileRecorder.h"
 //==============================================================================
 
 #define MAX_FILE_LENGTH 15.0 // seconds
@@ -153,6 +154,7 @@ private:
     
     juce::TextButton mStopButton;
     juce::TextButton mPlayButton;
+    juce::TextButton mRecordButton;
         
     juce::String mFileName;
     double mFileSampleRate;
@@ -163,9 +165,13 @@ private:
     juce::AudioFormatManager mFormatManager;
     
     std::unique_ptr<juce::FileInputSource> mFileSource;
-    
     BreakbeatAudioSource mAudioSource;
     juce::AudioTransportSource mTransportSource;
+    
+    std::vector<float*> mTemporaryChannels;
+    
+    FileRecorder mRecorder;
+    bool mRecording = false;
     
     WaveformComponent mWaveformComponent { *this, mFormatManager };
     
@@ -178,6 +184,8 @@ private:
     float mReverseSampleThreshold = 0.7;
     
     double mBlockDivisionPower = 1.0; // This should be stored as powers of 2 (whole = 1, half = 2, quarter = 4 etc)
+    
+    juce::File mRecordedFile {juce::File::getSpecialLocation(juce::File::SpecialLocationType::tempDirectory).getChildFile("toous").getChildFile("temp_recording.wav")};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
 };

@@ -26,6 +26,17 @@ bool FileRecorder::startRecording(juce::File file, int numChannels, double sampl
         return false;
     }
     
+    if(!file.existsAsFile())
+    {
+        file.create();
+    }
+    
+    if(!file.existsAsFile())
+    {
+        stopRecording();
+        return false;
+    }
+    
     auto outputStream = std::unique_ptr<juce::FileOutputStream>(file.createOutputStream());
     if(outputStream == nullptr)
     {
@@ -57,11 +68,15 @@ bool FileRecorder::startRecording(juce::File file, int numChannels, double sampl
                                         while(ptr.use_count() > 1) { }
                                     });
     
+    std::cout << "Start Recording on background thread: " << file.getFullPathName() << "\n";
+    
     return true;
 }
 
 void FileRecorder::stopRecording()
 {
+    std::cout << "Stop Recording on background thread\n";
+    
     juce::MessageManager::callAsync([ptr = std::move(mThreadedWriter)]()
     {
         while(ptr.use_count() > 1) { }

@@ -115,6 +115,7 @@ void MainContentComponent::WaveformComponent::handleAsyncUpdate()
 MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recentFiles)
 : juce::Thread("Background Thread")
 , mRecentFiles(recentFiles)
+, mRecorder(mFormatManager)
 {
     addAndMakeVisible (mClearButton);
     mClearButton.setButtonText ("Clear");
@@ -225,6 +226,21 @@ MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recent
         changeState(TransportState::Starting);
     };
     
+    addAndMakeVisible(mRecordButton);
+    mRecordButton.setButtonText("Record");
+    mRecordButton.onClick = [this]()
+    {
+        mRecording = !mRecording;
+        if(mRecording)
+        {
+            mRecorder.startRecording(mRecordedFile, 2, 44100.0, 32);
+        }
+        else
+        {
+            mRecorder.stopRecording();
+        }
+    };
+    
     addAndMakeVisible(mFileNameLabel);
     mFileNameLabel.setEditable(false);
     
@@ -261,8 +277,9 @@ void MainContentComponent::resized()
     mWaveformComponent.setBounds(10, 220, getWidth() - 20, 200);
     mFileNameLabel.setBounds(10, 450, (getWidth() - 20) * 0.5, 20);
     mFileSampleRateLabel.setBounds(getWidth() * 0.5 + 10, 450, (getWidth() - 20) * 0.5, 20);
-    mPlayButton.setBounds(10, 480, (getWidth() - 20) * 0.5, 20);
-    mStopButton.setBounds(getWidth() * 0.5 + 10, 480, (getWidth() - 20) * 0.5, 20);
+    mPlayButton.setBounds(10, 480, (getWidth() - 20) * 0.25, 20);
+    mRecordButton.setBounds((getWidth() - 20) * 0.50, 480, (getWidth() - 20) * 0.25, 20);
+    mStopButton.setBounds(getWidth() * 0.75 + 10, 480, (getWidth() - 20) * 0.25, 20);
 }
 
 void MainContentComponent::paint(juce::Graphics& g)
@@ -274,12 +291,26 @@ void MainContentComponent::prepareToPlay (int samplerPerBlockExpected, double sa
 {
     mAudioSource.prepareToPlay(samplerPerBlockExpected, sampleRate);
     mTransportSource.prepareToPlay(samplerPerBlockExpected, sampleRate);
+    
+    mTemporaryChannels.resize(2, nullptr);
 }
 
 void MainContentComponent::getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill)
 {
     bufferToFill.clearActiveBufferRegion();
     mTransportSource.getNextAudioBlock(bufferToFill);
+    
+    auto& buffer = *(bufferToFill.buffer);
+    auto const numChannels = std::min(static_cast<int>(mTemporaryChannels.size()), buffer.getNumChannels());
+    auto const numSamples = bufferToFill.numSamples;
+    auto const startSample = bufferToFill.startSample;
+    for(int ch = 0; ch < numChannels; ++ch)
+    {
+        mTemporaryChannels[static_cast<size_t>(ch)] = buffer.getWritePointer(ch, startSample);
+    }
+    
+    juce::AudioBuffer<float> localBuffer(mTemporaryChannels.data(), numChannels, numSamples);
+    mRecorder.processBlock(localBuffer);
     
     mWaveformComponent.setSampleStartEnd(mAudioSource.getStartReadPosition(), mAudioSource.getEndReadPosition());
 }

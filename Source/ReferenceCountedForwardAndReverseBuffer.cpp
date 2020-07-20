@@ -52,3 +52,8 @@ juce::AudioSampleBuffer* ReferenceCountedForwardAndReverseBuffer::getCurrentAudi
 {
     return mActiveBuffer;
 }
+
+juce::AudioSampleBuffer* ReferenceCountedForwardAndReverseBuffer::getForwardAudioSampleBuffer()
+{
+    return &mForwardBuffer;
+}

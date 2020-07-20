@@ -27,6 +27,7 @@ public:
     void updateCurrentSampleBuffer(float reverseThreshold);
     
     juce::AudioSampleBuffer* getCurrentAudioSampleBuffer();
+    juce::AudioSampleBuffer* getForwardAudioSampleBuffer();
     
 private:
     juce::String mName;

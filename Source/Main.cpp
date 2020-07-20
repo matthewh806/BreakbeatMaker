@@ -54,7 +54,8 @@ public:
     enum CommandIds
     {
         FileOpenRecent = 0x2002000,
-        OutputFilePath = 0x2002001
+        OutputFilePath = 0x2002001,
+        ExportAudioSlices = 0x2002002
     };
     
     juce::ApplicationCommandTarget* getNextCommandTarget() override
@@ -67,7 +68,8 @@ public:
         const juce::CommandID ids[] =
         {
             CommandIds::FileOpenRecent,
-            CommandIds::OutputFilePath
+            CommandIds::OutputFilePath,
+            CommandIds::ExportAudioSlices
         };
         
         commands.addArray(ids, numElementsInArray(ids));
@@ -85,8 +87,14 @@ public:
                 break;
             case CommandIds::OutputFilePath:
             {
-                result.setInfo("Set output path", "Set the output path to write recordings to", "File", 1);
+                result.setInfo("Set output path", "Set the output path to write recordings to", "File", 0);
                 result.setActive(true);
+            }
+                break;
+            case CommandIds::ExportAudioSlices:
+            {
+                result.setInfo("Export the current slices", "Export the current slices to individual audio files", "File", 0);
+                result.setActive(true); // TODO: only if there is an audio file!
             }
                 break;
         }
@@ -103,6 +111,11 @@ public:
             case CommandIds::OutputFilePath:
             {
                 mContent.setFileOutputPath();
+                return true;
+            }
+            case CommandIds::ExportAudioSlices:
+            {
+                mContent.exportAudioSlices();
                 return true;
             }
         }

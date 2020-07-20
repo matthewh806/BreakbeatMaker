@@ -115,7 +115,6 @@ void MainContentComponent::WaveformComponent::handleAsyncUpdate()
 MainContentComponent::MainContentComponent(juce::RecentlyOpenedFilesList& recentFiles)
 : juce::Thread("Background Thread")
 , mRecentFiles(recentFiles)
-, mRecorder(mFormatManager)
 {
     getLookAndFeel().setColour (MainContentComponent::ColourIds::backgroundColourId, juce::Colours::transparentBlack);
     getLookAndFeel().setColour (MainContentComponent::ColourIds::playingButtonColourId, juce::Colours::green);
@@ -377,6 +376,29 @@ void MainContentComponent::setFileOutputPath()
     if(fileChooser.browseForFileToSave(true))
     {
         mRecordedFile = fileChooser.getResult();
+    }
+}
+
+void MainContentComponent::exportAudioSlices()
+{
+    // TODO: Check its not already exporting; cleanup
+    juce::FileChooser fileChooser("Export slices to file(s)...", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.wav");
+    if(!fileChooser.browseForFileToSave(true))
+    {
+        return;
+    }
+    
+    auto file = fileChooser.getResult();
+    try
+    {
+        auto* readBuffer = mAudioSource.getCurrentBuffer();
+        auto fileName = file.getFileNameWithoutExtension();
+        auto path = file.getParentDirectory().getFullPathName();
+        mSliceExporter.startExport(readBuffer, fileName, path, mAudioSource.getSliceSize(), mAudioSource.getNumSlices(), 2, 44100.0, 32);
+    }
+    catch (std::exception e)
+    {
+        juce::AlertWindow::showMessageBox(juce::AlertWindow::AlertIconType::WarningIcon, "Failed to export slices", e.what());
     }
 }
 

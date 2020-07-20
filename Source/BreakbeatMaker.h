@@ -51,6 +51,7 @@
 #include "ReferenceCountedForwardAndReverseBuffer.h"
 #include "BreakbeatAudioSource.h"
 #include "FileRecorder.h"
+#include "SliceExporter.h"
 //==============================================================================
 
 #define MAX_FILE_LENGTH 15.0 // seconds
@@ -93,6 +94,7 @@ public:
     
     void newFileOpened(String& filePath);
     void setFileOutputPath();
+    void exportAudioSlices();
 
 private:
     enum class TransportState
@@ -179,8 +181,10 @@ private:
     
     std::vector<float*> mTemporaryChannels;
     
-    FileRecorder mRecorder;
+    FileRecorder mRecorder {mFormatManager};
     bool mRecording = false;
+    
+    SliceExporter mSliceExporter {mFormatManager};
     
     WaveformComponent mWaveformComponent { *this, mFormatManager };
     

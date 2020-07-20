@@ -27,9 +27,12 @@ public:
     BreakbeatAudioSource();
     ~BreakbeatAudioSource() override;
     
-    int64_t getNumSamples();
-    int64_t getStartReadPosition();
-    int64_t getEndReadPosition();
+    int64_t getNumSamples() const;
+    int getNumSlices() const;
+    int64_t getSliceSize() const;
+    int64_t getStartReadPosition() const;
+    
+    juce::AudioSampleBuffer* getCurrentBuffer();
     
     void setSampleChangeThreshold(float threshold);
     void setReverseSampleThreshold(float threshold);

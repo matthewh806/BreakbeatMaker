@@ -20,7 +20,7 @@ BreakbeatAudioSource::~BreakbeatAudioSource()
     
 }
 
-int64_t BreakbeatAudioSource::getNumSamples()
+int64_t BreakbeatAudioSource::getNumSamples() const
 {
     ReferenceCountedForwardAndReverseBuffer::Ptr retainedBuffer(mCurrentBuffer);
     if(retainedBuffer == nullptr)
@@ -37,14 +37,30 @@ int64_t BreakbeatAudioSource::getNumSamples()
     return currentAudioBuffer->getNumSamples();
 }
 
-int64_t BreakbeatAudioSource::getStartReadPosition()
+int BreakbeatAudioSource::getNumSlices() const
+{
+    return mNumSlices.load();
+}
+
+int64_t BreakbeatAudioSource::getSliceSize() const
+{
+    return mSliceSampleSize.load();
+}
+
+int64_t BreakbeatAudioSource::getStartReadPosition() const
 {
     return mStartReadPosition.load();
 }
 
-int64_t BreakbeatAudioSource::getEndReadPosition()
+juce::AudioSampleBuffer* BreakbeatAudioSource::getCurrentBuffer()
 {
-    return mEndReadPosition.load();
+    ReferenceCountedForwardAndReverseBuffer::Ptr retainedBuffer(mCurrentBuffer);
+    if(retainedBuffer == nullptr)
+    {
+        return nullptr;
+    }
+    
+    return retainedBuffer->getForwardAudioSampleBuffer();
 }
 
 void BreakbeatAudioSource::setSampleChangeThreshold(float threshold)
